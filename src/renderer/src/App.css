@@ -1,0 +1,65 @@
+@import "tailwindcss";
+@source "./**/*.tsx";
+
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial,
+    sans-serif;
+}
+
+/* Light theme (default) */
+body[data-theme="light"] {
+  --bg: #ffffff;
+  --sidebar-bg: #f6f8fa;
+  --sidebar-border: #d0d7de;
+  --tab-bg: transparent;
+  --tab-active-bg: #ffffff;
+  --tab-hover-bg: #eaeef2;
+  --tab-text: #57606a;
+  --tab-active-text: #24292f;
+  --tab-close: #57606a;
+  --tab-close-hover: #24292f;
+  --status-bg: #f6f8fa;
+  --status-border: #d0d7de;
+  --status-text: #57606a;
+  --empty-text: #8b949e;
+  --btn-bg: transparent;
+  --btn-hover-bg: #eaeef2;
+  --btn-text: #57606a;
+  --seg-active-bg: #eaeef2;
+  --seg-active-text: #24292f;
+}
+
+/* Dark theme */
+body[data-theme="dark"] {
+  --bg: #0d1117;
+  --sidebar-bg: #161b22;
+  --sidebar-border: #30363d;
+  --tab-bg: transparent;
+  --tab-active-bg: #0d1117;
+  --tab-hover-bg: #21262d;
+  --tab-text: #8b949e;
+  --tab-active-text: #e6edf3;
+  --tab-close: #8b949e;
+  --tab-close-hover: #e6edf3;
+  --status-bg: #161b22;
+  --status-border: #30363d;
+  --status-text: #8b949e;
+  --empty-text: #484f58;
+  --btn-bg: transparent;
+  --btn-hover-bg: #21262d;
+  --btn-text: #8b949e;
+  --seg-active-bg: #30363d;
+  --seg-active-text: #e6edf3;
+}
+
+* {
+  scrollbar-width: thin;
+}
+
+.markdown-body {
+  background: transparent !important;
+}

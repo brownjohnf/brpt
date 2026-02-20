@@ -2,34 +2,24 @@
   "name": "brett-rad-preview-tool",
   "version": "1.0.0",
   "description": "Live-updating markdown preview tool",
-  "main": "main.js",
+  "main": "./out/main/index.js",
   "scripts": {
-    "start": "electron .",
-    "build": "electron-builder --mac"
-  },
-  "build": {
-    "appId": "com.brett.rad-preview-tool",
-    "productName": "Brett's Rad Preview Tool",
-    "mac": {
-      "icon": "icon.icns",
-      "category": "public.app-category.developer-tools",
-      "target": "dir"
-    },
-    "files": [
-      "main.js",
-      "preload.js",
-      "renderer/**/*",
-      "node_modules/**/*"
-    ],
-    "fileAssociations": [
-      {
-        "ext": "md",
-        "name": "Markdown",
-        "role": "Viewer"
-      }
-    ]
+    "dev": "electron-vite dev",
+    "start": "electron-vite preview",
+    "build": "electron-vite build",
+    "install:mac": "cp -R \"dist/mac-arm64/Brett's Rad Preview Tool.app\" ~/Applications/ && npm run install:cli",
+    "install:cli": "[ -L /usr/local/bin/brpt ] || sudo ln -sf ~/Applications/Brett\\'s\\ Rad\\ Preview\\ Tool.app/Contents/Resources/brpt /usr/local/bin/brpt",
+    "uninstall:mac": "npm run uninstall:cli && rm -rf ~/Applications/Brett\\'s\\ Rad\\ Preview\\ Tool.app",
+    "uninstall:cli": "sudo rm -f /usr/local/bin/brpt",
+    "build:mac": "electron-vite build && electron-builder --mac",
+    "build:mac:install": "npm run build:mac && npm run install:mac",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
+    "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
+    "typecheck": "npm run typecheck:node && npm run typecheck:web"
   },
   "dependencies": {
+    "@electron-toolkit/preload": "^3.0.2",
+    "@electron-toolkit/utils": "^4.0.0",
     "chokidar": "^4.0.3",
     "github-markdown-css": "^5.8.1",
     "highlight.js": "^11.11.1",
@@ -37,7 +27,17 @@
     "marked-highlight": "^2.2.1"
   },
   "devDependencies": {
+    "@electron-toolkit/tsconfig": "^2.0.0",
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.0.0",
     "electron": "^34.2.0",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^3.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.9.3"
   }
 }

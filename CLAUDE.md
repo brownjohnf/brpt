@@ -7,40 +7,60 @@ Live-updating markdown preview tool built with Electron. Strictly a viewer — n
 ```
 brett-rad-preview-tool/
 ├── package.json
-├── main.js              # Electron main process (window, file watching, IPC)
-├── preload.js           # Context bridge (markdown rendering via marked + highlight.js)
-├── renderer/
-│   ├── index.html       # Shell: sidebar + content area + status bar
-│   ├── style.css        # Layout + theme styles (CSS custom properties)
-│   └── renderer.js      # Tab management, IPC listeners, drag-and-drop
-├── config.json          # Persisted settings (theme, last-open files) — auto-generated
-├── icon.icns            # macOS app icon
-└── icon.iconset/        # Source PNGs for the icon
+├── electron.vite.config.ts
+├── electron-builder.yml
+├── tsconfig.json              # Solution-style (references node + web)
+├── tsconfig.node.json         # Main + preload (Node target)
+├── tsconfig.web.json          # Renderer (browser target)
+├── src/
+│   ├── main/
+│   │   └── index.ts           # Electron main process (window, file watching, IPC)
+│   ├── preload/
+│   │   ├── index.ts           # Context bridge (markdown rendering via marked + highlight.js)
+│   │   └── index.d.ts         # Type declarations for renderer access
+│   └── renderer/
+│       ├── index.html         # Vite entry HTML
+│       └── src/
+│           ├── main.tsx       # React entry point
+│           ├── App.tsx        # Root component (state, IPC, keyboard shortcuts)
+│           ├── App.css        # Tailwind + theme CSS variables
+│           ├── types.ts       # Shared interfaces (AppConfig, FileData, Tab)
+│           ├── useThemeStyles.ts  # Theme stylesheet toggling hook
+│           └── components/
+│               ├── Sidebar.tsx
+│               ├── TabItem.tsx
+│               ├── ContentArea.tsx
+│               └── StatusBar.tsx
+├── out/                       # Build output (gitignored)
+├── config.json                # Persisted settings (theme, last-open files) — auto-generated
+├── icon.icns                  # macOS app icon
+└── icon.iconset/              # Source PNGs for the icon
 ```
 
-No build tooling (webpack/vite). Plain HTML/CSS/JS for the renderer. Markdown rendering happens in the preload script (which has Node access via `sandbox: false`).
+Built with electron-vite (Vite for all three targets: main, preload, renderer). React + TypeScript + Tailwind v4 for the renderer. Markdown rendering happens in the preload script (which has Node access via `sandbox: false`).
 
 ## Running
 
 ```bash
-npm start                    # Open with no files
-npm start -- path/to/file.md # Open with a file
+npm run dev                        # Dev mode with HMR
+npm run dev -- -- path/to/file.md  # Dev mode, open a file
 ```
 
 ## Building
 
 ```bash
-npm run build   # Produces .app in dist/mac-arm64/
+npm run build      # Build to out/
+npm run build:mac  # Build + package .app
 ```
 
-Uses `electron-builder`. The app is unsigned (no Apple Developer cert).
+Uses `electron-builder` (config in `electron-builder.yml`). The app is unsigned (no Apple Developer cert).
 
 ## Key Design Decisions
 
 - **Single instance**: Uses `app.requestSingleInstanceLock()`. Second launches forward their CLI args to the first instance.
 - **File watching**: chokidar in the main process, sends updates via IPC.
 - **Markdown rendering in preload**: The renderer has `contextIsolation: true` and no Node access. Rendering (marked + highlight.js) lives in the preload script which exposes `mdview.renderMarkdown()` to the renderer.
-- **Theme**: Two themes (light/dark) via `data-theme` attribute on `<body>`. Uses `github-markdown-css` light/dark variants and matching `highlight.js` themes.
+- **Theme**: Two themes (light/dark) via `data-theme` attribute on `<body>`. Theme stylesheets (github-markdown-css, highlight.js) are imported as raw CSS and toggled via `<style disabled>` elements in the `useThemeStyles` hook.
 - **Session restore**: Open files are persisted to `config.json` and restored on next launch.
 
 ## Expected Behaviors
@@ -60,6 +80,10 @@ Never say "Honestly" - you're always honest to the best of your ability.
 **When the user points out a potential problem:** Do not immediately agree ("You're right", "Good catch", etc.). Investigate the issue first, then state what you found. Don't be a sycophant - validate claims before affirming them.
 
 **Never call something "error-prone."** Always say _what_ the error is, _why_ it happens, and _how_ it manifests.
+
+## Exploration Guidelines
+
+- Never read files in `node_modules/` when exploring the codebase. Only read a specific module's source if you need to understand that module's API or behavior.
 
 ## Code Guidelines
 

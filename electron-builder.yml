@@ -1,0 +1,25 @@
+appId: com.brett.rad-preview-tool
+productName: "Brett's Rad Preview Tool"
+directories:
+  buildResources: build
+files:
+  - "!**/.vscode/*"
+  - "!src/*"
+  - "!electron.vite.config.{js,ts,mjs,cjs}"
+  - "!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}"
+  - "!{.env,.env.*,.npmrc}"
+extraResources:
+  - from: resources/brpt
+    to: brpt
+asarUnpack:
+  - resources/**
+mac:
+  icon: icon.icns
+  category: public.app-category.developer-tools
+  target: dir
+  notarize: false
+fileAssociations:
+  - ext: md
+    name: Markdown
+    role: Viewer
+npmRebuild: false
