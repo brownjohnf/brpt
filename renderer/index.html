@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <title>Brett's Rad Preview Tool</title>
+    <link
+      rel="stylesheet"
+      href="../node_modules/github-markdown-css/github-markdown-light.css"
+      id="markdown-theme-light"
+    />
+    <link
+      rel="stylesheet"
+      href="../node_modules/github-markdown-css/github-markdown-dark.css"
+      id="markdown-theme-dark"
+      disabled
+    />
+    <link
+      rel="stylesheet"
+      href="../node_modules/highlight.js/styles/github.css"
+      id="hljs-theme-light"
+    />
+    <link
+      rel="stylesheet"
+      href="../node_modules/highlight.js/styles/github-dark.css"
+      id="hljs-theme-dark"
+      disabled
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body data-theme="light">
+    <div id="app">
+      <div id="sidebar">
+        <div id="tab-list"></div>
+        <div id="sidebar-bottom">
+          <button id="add-btn" title="Open file">+</button>
+          <button id="theme-toggle" title="Toggle theme">&#9680;</button>
+        </div>
+      </div>
+      <div id="main">
+        <div id="content" class="markdown-body"></div>
+        <div id="empty-state">
+          <p>No files open</p>
+          <p>
+            Drop a <code>.md</code> file here, click <strong>+</strong>, or pass
+            files as CLI arguments
+          </p>
+        </div>
+      </div>
+    </div>
+    <div id="status-bar">
+      <span id="status-text"></span>
+    </div>
+    <script src="renderer.js"></script>
+  </body>
+</html>
