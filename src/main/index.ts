@@ -4,23 +4,18 @@ import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import fs from "fs";
 import os from "os";
 import { dirname, join, resolve } from "path";
+import type { AppConfig, FileData } from "../shared/types";
 
-interface AppConfig {
-  theme: "light" | "dark";
-  openFiles: string[];
-  containerFolders: string[];
+const DEFAULT_CONFIG: AppConfig = {
+  theme: "light",
+  openFiles: [],
+  containerFolders: [],
   contentWidth: {
-    mode: "fixed" | "capped" | "full";
-    fixedWidth: string;
-    cappedWidth: string;
-  };
-}
-
-interface FileData {
-  path: string;
-  content: string;
-  mtimeMs: number;
-}
+    mode: "fixed",
+    fixedWidth: "880px",
+    cappedWidth: "1200px",
+  },
+};
 
 const DEFAULT_CONFIG_PATH = join(os.homedir(), ".brpt", "brpt-config.json");
 const CONFIG_PATH = process.env.BRPT_CONFIG || DEFAULT_CONFIG_PATH;
@@ -34,21 +29,17 @@ function loadConfig(): AppConfig {
   try {
     return JSON.parse(fs.readFileSync(CONFIG_PATH, "utf-8"));
   } catch {
-    return {
-      theme: "light",
-      openFiles: [],
-      containerFolders: [],
-      contentWidth: {
-        mode: "fixed",
-        fixedWidth: "880px",
-        cappedWidth: "1200px",
-      },
-    };
+    return { ...DEFAULT_CONFIG };
   }
 }
 
 function saveConfig(config: AppConfig): void {
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+  try {
+    fs.mkdirSync(dirname(CONFIG_PATH), { recursive: true });
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+  } catch (err) {
+    console.error(`Failed to save config to ${CONFIG_PATH}:`, err);
+  }
 }
 
 function resolveFilePath(filePath: string): string {
@@ -186,16 +177,7 @@ function ensureConfigExists(): boolean {
   }
   try {
     fs.mkdirSync(dirname(CONFIG_PATH), { recursive: true });
-    saveConfig({
-      theme: "light",
-      openFiles: [],
-      containerFolders: [],
-      contentWidth: {
-        mode: "fixed",
-        fixedWidth: "880px",
-        cappedWidth: "1200px",
-      },
-    });
+    saveConfig({ ...DEFAULT_CONFIG });
     return true;
   } catch {
     dialog.showErrorBox(

@@ -1,16 +1,16 @@
 import { forwardRef, useMemo } from "react";
-import type { Tab } from "../types";
+import type { ContentWidthConfig, Tab } from "../types";
 
 const { mdview } = window;
 
 interface ContentAreaProps {
   activeTab: Tab | null;
-  maxWidth: string | undefined;
+  contentWidth: ContentWidthConfig;
   onDrop: (e: React.DragEvent) => void;
 }
 
 export const ContentArea = forwardRef<HTMLDivElement, ContentAreaProps>(
-  function ContentArea({ activeTab, maxWidth, onDrop }, ref) {
+  function ContentArea({ activeTab, contentWidth, onDrop }, ref) {
     const renderedHtml = useMemo(() => {
       if (!activeTab) {
         return "";
@@ -25,10 +25,24 @@ export const ContentArea = forwardRef<HTMLDivElement, ContentAreaProps>(
       }
     }
 
+    const contentStyle: React.CSSProperties = (() => {
+      switch (contentWidth.mode) {
+        case "fixed":
+          return {
+            width: contentWidth.fixedWidth,
+            minWidth: contentWidth.fixedWidth,
+          };
+        case "capped":
+          return { maxWidth: contentWidth.cappedWidth };
+        case "full":
+          return {};
+      }
+    })();
+
     return (
       <div
         ref={ref}
-        className="flex-1 overflow-y-auto p-8 relative"
+        className="flex-1 overflow-auto p-8 relative"
         style={{ background: "var(--bg)" }}
         onDragOver={handleDragOver}
         onDrop={onDrop}
@@ -36,7 +50,7 @@ export const ContentArea = forwardRef<HTMLDivElement, ContentAreaProps>(
         {activeTab ? (
           <div
             className="markdown-body mx-auto"
-            style={{ maxWidth }}
+            style={contentStyle}
             dangerouslySetInnerHTML={{ __html: renderedHtml }}
           />
         ) : (
@@ -57,5 +71,5 @@ export const ContentArea = forwardRef<HTMLDivElement, ContentAreaProps>(
         )}
       </div>
     );
-  }
+  },
 );

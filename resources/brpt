@@ -9,16 +9,29 @@ done
 SCRIPT_DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
 APP_PATH="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
-# Resolve file paths to absolute before passing to open
+if [ $# -eq 0 ]; then
+  open -a "$APP_PATH"
+  exit 0
+fi
+
+# Resolve file paths to absolute, rejecting any that don't exist
 FILES=()
+HAD_ERROR=0
 for arg in "$@"; do
   if [ -f "$arg" ]; then
     FILES+=("$(cd "$(dirname "$arg")" && pwd)/$(basename "$arg")")
+  else
+    echo "brpt: $arg: No such file" >&2
+    HAD_ERROR=1
   fi
 done
 
 if [ ${#FILES[@]} -eq 0 ]; then
-  open -a "$APP_PATH"
-else
-  open -a "$APP_PATH" "${FILES[@]}"
+  exit 1
+fi
+
+open -a "$APP_PATH" "${FILES[@]}"
+
+if [ "$HAD_ERROR" -eq 1 ]; then
+  exit 1
 fi

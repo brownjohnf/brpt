@@ -3,24 +3,14 @@ import hljs from "highlight.js";
 import { Marked } from "marked";
 import { markedHighlight } from "marked-highlight";
 import os from "os";
-
-export interface AppConfig {
-  theme: "light" | "dark";
-  openFiles: string[];
-  containerFolders: string[];
-}
-
-export interface FileData {
-  path: string;
-  content: string;
-  mtimeMs: number;
-}
+import type { AppConfig, FileData } from "../shared/types";
+export type { AppConfig, FileData };
 
 export interface MdviewApi {
   renderMarkdown(text: string): string;
-  onFileUpdated(callback: (data: FileData) => void): void;
-  onFilesFromArgs(callback: (files: FileData[]) => void): void;
-  onConfigLoaded(callback: (config: AppConfig) => void): void;
+  onFileUpdated(callback: (data: FileData) => void): () => void;
+  onFilesFromArgs(callback: (files: FileData[]) => void): () => void;
+  onConfigLoaded(callback: (config: AppConfig) => void): () => void;
   openFileDialog(): Promise<FileData[]>;
   requestFile(filePath: string): Promise<FileData | null>;
   closeFile(filePath: string): void;
@@ -43,20 +33,32 @@ const marked = new Marked(
 );
 
 const api: MdviewApi = {
-  renderMarkdown: (text: string) => marked.parse(text) as string,
+  renderMarkdown: (text: string) =>
+    marked.parse(text, { async: false }) as string,
 
   onFileUpdated: (callback: (data: FileData) => void) => {
-    ipcRenderer.on("file-updated", (_event, data: FileData) => callback(data));
+    const listener = (_event: Electron.IpcRendererEvent, data: FileData): void =>
+      callback(data);
+    ipcRenderer.on("file-updated", listener);
+    return () => {
+      ipcRenderer.removeListener("file-updated", listener);
+    };
   },
   onFilesFromArgs: (callback: (files: FileData[]) => void) => {
-    ipcRenderer.on("files-from-args", (_event, files: FileData[]) =>
-      callback(files)
-    );
+    const listener = (_event: Electron.IpcRendererEvent, files: FileData[]): void =>
+      callback(files);
+    ipcRenderer.on("files-from-args", listener);
+    return () => {
+      ipcRenderer.removeListener("files-from-args", listener);
+    };
   },
   onConfigLoaded: (callback: (config: AppConfig) => void) => {
-    ipcRenderer.on("config-loaded", (_event, config: AppConfig) =>
-      callback(config)
-    );
+    const listener = (_event: Electron.IpcRendererEvent, config: AppConfig): void =>
+      callback(config);
+    ipcRenderer.on("config-loaded", listener);
+    return () => {
+      ipcRenderer.removeListener("config-loaded", listener);
+    };
   },
   openFileDialog: () => ipcRenderer.invoke("open-file-dialog"),
   requestFile: (filePath: string) =>

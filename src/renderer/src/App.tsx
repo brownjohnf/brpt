@@ -1,28 +1,24 @@
-import {
-  useCallback,
-  useEffect,
-  useEffectEvent,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { ContentArea } from "./components/ContentArea";
 import { Sidebar } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
 import { TopBar } from "./components/TopBar";
+import { initialTabsState, tabsReducer } from "./tabsReducer";
 import type {
   AppConfig,
   ContentWidthConfig,
   ContentWidthMode,
   FileData,
-  Tab,
 } from "./types";
 import { useThemeStyles } from "./useThemeStyles";
 
 const { mdview } = window;
 
 export default function App(): JSX.Element {
-  const [tabs, setTabs] = useState<Tab[]>([]);
-  const [activeIndex, setActiveIndex] = useState(-1);
+  const [{ tabs, activeIndex }, dispatch] = useReducer(
+    tabsReducer,
+    initialTabsState,
+  );
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [containerFolders, setContainerFolders] = useState<string[]>([]);
   const [contentWidth, setContentWidth] = useState<ContentWidthConfig>({
@@ -36,87 +32,29 @@ export default function App(): JSX.Element {
   const activeTab =
     activeIndex >= 0 && activeIndex < tabs.length ? tabs[activeIndex] : null;
 
-  const persistOpenFiles = useCallback((currentTabs: Tab[]) => {
-    mdview.saveOpenFiles(currentTabs.map((t) => t.path));
+  const openFile = useCallback((data: FileData) => {
+    dispatch({ type: "OPEN_FILE", data });
   }, []);
-
-  const openFile = useCallback(
-    (data: FileData) => {
-      setTabs((prev) => {
-        const existing = prev.findIndex((t) => t.path === data.path);
-        if (existing !== -1) {
-          const updated = [...prev];
-          updated[existing] = { ...updated[existing], content: data.content };
-          setActiveIndex(existing);
-          return updated;
-        }
-        const next: Tab[] = [
-          ...prev,
-          {
-            path: data.path,
-            content: data.content,
-            mtimeMs: data.mtimeMs,
-            scrollTop: 0,
-            lastModifiedAt: Temporal.Instant.fromEpochMilliseconds(Math.floor(data.mtimeMs)),
-            hasUnseenChanges: false,
-          },
-        ];
-        setActiveIndex(next.length - 1);
-        persistOpenFiles(next);
-        return next;
-      });
-    },
-    [persistOpenFiles]
-  );
 
   const closeTab = useCallback(
     (index: number) => {
-      setTabs((prev) => {
-        if (index < 0 || index >= prev.length) {
-          return prev;
-        }
-        mdview.closeFile(prev[index].path);
-        const next = prev.filter((_, i) => i !== index);
-        if (next.length === 0) {
-          setActiveIndex(-1);
-        } else if (activeIndex >= next.length) {
-          setActiveIndex(next.length - 1);
-        } else if (index <= activeIndex) {
-          setActiveIndex(Math.max(0, activeIndex - 1));
-        }
-        persistOpenFiles(next);
-        return next;
-      });
+      if (index >= 0 && index < tabs.length) {
+        mdview.closeFile(tabs[index].path);
+      }
+      dispatch({ type: "CLOSE_TAB", index });
     },
-    [activeIndex, persistOpenFiles]
+    [tabs],
   );
 
   const activateTab = useCallback(
     (index: number) => {
-      // Save current scroll position before switching
-      if (mainRef.current && activeIndex >= 0) {
-        setTabs((prev) => {
-          const updated = [...prev];
-          if (updated[activeIndex]) {
-            updated[activeIndex] = {
-              ...updated[activeIndex],
-              scrollTop: mainRef.current?.scrollTop ?? 0,
-            };
-          }
-          return updated;
-        });
-      }
-      setTabs((prev) => {
-        if (!prev[index] || !prev[index].hasUnseenChanges) {
-          return prev;
-        }
-        const updated = [...prev];
-        updated[index] = { ...updated[index], hasUnseenChanges: false };
-        return updated;
+      dispatch({
+        type: "ACTIVATE_TAB",
+        index,
+        currentScrollTop: mainRef.current?.scrollTop ?? 0,
       });
-      setActiveIndex(index);
     },
-    [activeIndex]
+    [],
   );
 
   const changeContentWidthMode = useCallback((mode: ContentWidthMode) => {
@@ -153,7 +91,7 @@ export default function App(): JSX.Element {
     async (e: React.DragEvent) => {
       e.preventDefault();
       const files = Array.from(e.dataTransfer.files).filter((f) =>
-        f.name.endsWith(".md")
+        f.name.endsWith(".md"),
       );
       for (const file of files) {
         const result = await mdview.requestFile(file.path);
@@ -162,8 +100,16 @@ export default function App(): JSX.Element {
         }
       }
     },
-    [openFile]
+    [openFile],
   );
+
+  // Persist open files whenever the tab list changes
+  const tabPaths = tabs.map((t) => t.path).join("\0");
+  useEffect(() => {
+    if (tabs.length > 0) {
+      mdview.saveOpenFiles(tabs.map((t) => t.path));
+    }
+  }, [tabPaths]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Restore scroll position when active tab changes
   useEffect(() => {
@@ -172,43 +118,28 @@ export default function App(): JSX.Element {
     }
   }, [activeIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleFileUpdated = useEffectEvent((data: FileData) => {
-    setTabs((prev) => {
-      const index = prev.findIndex((t) => t.path === data.path);
-      if (index === -1) {
-        return prev;
-      }
-      const updated = [...prev];
-      updated[index] = {
-        ...updated[index],
-        content: data.content,
-        mtimeMs: data.mtimeMs,
-        lastModifiedAt: Temporal.Instant.fromEpochMilliseconds(Math.floor(data.mtimeMs)),
-        hasUnseenChanges: index !== activeIndex,
-      };
-      return updated;
-    });
-  });
-
   // IPC listeners
   useEffect(() => {
-    mdview.onFileUpdated(handleFileUpdated);
-
-    mdview.onFilesFromArgs((files: FileData[]) => {
-      files.forEach((f) => openFile(f));
-    });
-
-    mdview.onConfigLoaded((config: AppConfig) => {
-      if (config.theme) {
-        setTheme(config.theme);
-      }
-      if (config.containerFolders) {
-        setContainerFolders(config.containerFolders);
-      }
-      if (config.contentWidth) {
-        setContentWidth((prev) => ({ ...prev, ...config.contentWidth }));
-      }
-    });
+    const unsubs = [
+      mdview.onFileUpdated((data: FileData) => {
+        dispatch({ type: "FILE_UPDATED", data });
+      }),
+      mdview.onFilesFromArgs((files: FileData[]) => {
+        files.forEach((f) => openFile(f));
+      }),
+      mdview.onConfigLoaded((config: AppConfig) => {
+        if (config.theme) {
+          setTheme(config.theme);
+        }
+        if (config.containerFolders) {
+          setContainerFolders(config.containerFolders);
+        }
+        if (config.contentWidth) {
+          setContentWidth((prev) => ({ ...prev, ...config.contentWidth }));
+        }
+      }),
+    ];
+    return () => unsubs.forEach((fn) => fn());
   }, [openFile]);
 
   // Keyboard shortcuts
@@ -268,13 +199,7 @@ export default function App(): JSX.Element {
           <ContentArea
             ref={mainRef}
             activeTab={activeTab}
-            maxWidth={
-              contentWidth.mode === "full"
-                ? undefined
-                : contentWidth.mode === "fixed"
-                  ? contentWidth.fixedWidth
-                  : contentWidth.cappedWidth
-            }
+            contentWidth={contentWidth}
             onDrop={handleDrop}
           />
         </div>
