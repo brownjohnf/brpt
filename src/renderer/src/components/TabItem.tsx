@@ -51,24 +51,6 @@ export function TabItem({
       style={{ color: textColor }}
       onClick={onClick}
     >
-      {tab.hasUnseenChanges && (
-        <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-[var(--tab-changed-dot)]" />
-      )}
-      <span
-        className={classNames(
-          "overflow-hidden text-ellipsis flex-1",
-          groupRootPath && "text-right [direction:rtl]"
-        )}
-        style={groupRootPath ? { color: "var(--sidebar-border)" } : undefined}
-        title={tab.path}
-      >
-        <bdo dir="ltr">
-          {prefix && <span>{prefix}</span>}
-          <span style={groupRootPath ? { color: textColor } : undefined}>
-            {filename}
-          </span>
-        </bdo>
-      </span>
       <button
         className={classNames(
           "hidden group-hover:block",
@@ -83,6 +65,21 @@ export function TabItem({
       >
         &times;
       </button>
+      {tab.hasUnseenChanges && (
+        <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-[var(--tab-changed-dot)]" />
+      )}
+      <span
+        className="overflow-hidden text-ellipsis flex-1 text-right [direction:rtl]"
+        style={groupRootPath ? { color: "var(--sidebar-border)" } : undefined}
+        title={tab.path}
+      >
+        <bdo dir="ltr">
+          {prefix && <span>{prefix}</span>}
+          <span style={groupRootPath ? { color: textColor } : undefined}>
+            {filename}
+          </span>
+        </bdo>
+      </span>
     </div>
   );
 }
