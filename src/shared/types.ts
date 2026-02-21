@@ -11,6 +11,7 @@ export interface AppConfig {
   openFiles: string[];
   containerFolders: string[];
   contentWidth: ContentWidthConfig;
+  brpt_development_roots?: string[];
 }
 
 export interface FileData {

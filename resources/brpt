@@ -9,9 +9,24 @@ done
 SCRIPT_DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
 APP_PATH="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
-if [ $# -eq 0 ]; then
-  open -a "$APP_PATH"
-  exit 0
+# Resolve config path
+DEFAULT_CONFIG_PATH="$HOME/.brpt/brpt-config.json"
+CONFIG_PATH="${BRPT_CONFIG:-$DEFAULT_CONFIG_PATH}"
+
+# Parse brpt_development_roots from config
+DEV_ROOTS=()
+if [ -f "$CONFIG_PATH" ]; then
+  while IFS= read -r root; do
+    [ -n "$root" ] && DEV_ROOTS+=("$root")
+  done < <(python3 -c "
+import json, sys
+try:
+    cfg = json.load(open(sys.argv[1]))
+    for r in cfg.get('brpt_development_roots', []):
+        print(r)
+except Exception:
+    pass
+" "$CONFIG_PATH" 2>/dev/null)
 fi
 
 # Resolve file paths to absolute, rejecting any that don't exist
@@ -26,8 +41,31 @@ for arg in "$@"; do
   fi
 done
 
-if [ ${#FILES[@]} -eq 0 ]; then
+# If files were requested but none were valid, exit early
+if [ $# -gt 0 ] && [ ${#FILES[@]} -eq 0 ]; then
   exit 1
+fi
+
+# Check for a running dev instance
+for DEV_ROOT in "${DEV_ROOTS[@]}"; do
+  ELECTRON_APP="$DEV_ROOT/node_modules/electron/dist/Electron.app"
+  if pgrep -qf "$ELECTRON_APP/Contents/MacOS/Electron"; then
+    if [ ${#FILES[@]} -gt 0 ]; then
+      open -a "$ELECTRON_APP" "${FILES[@]}"
+    else
+      open -a "$ELECTRON_APP"
+    fi
+    if [ "$HAD_ERROR" -eq 1 ]; then
+      exit 1
+    fi
+    exit 0
+  fi
+done
+
+# No dev instance — fall back to packaged app
+if [ $# -eq 0 ]; then
+  open -a "$APP_PATH"
+  exit 0
 fi
 
 open -a "$APP_PATH" "${FILES[@]}"
