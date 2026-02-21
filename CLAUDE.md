@@ -10,9 +10,14 @@ brett-rad-preview-tool/
 ├── electron.vite.config.ts
 ├── electron-builder.yml
 ├── tsconfig.json              # Solution-style (references node + web)
-├── tsconfig.node.json         # Main + preload (Node target)
-├── tsconfig.web.json          # Renderer (browser target)
+├── tsconfig.node.json         # Main + preload + shared (Node target)
+├── tsconfig.web.json          # Renderer + shared (browser target)
+├── resources/
+│   └── brpt                   # CLI script (bundled into .app, symlinked to /usr/local/bin)
 ├── src/
+│   ├── shared/
+│   │   ├── types.ts           # Canonical types (AppConfig, FileData, ContentWidthConfig)
+│   │   └── date-ban.d.ts      # @deprecated overlays on Date (use Temporal instead)
 │   ├── main/
 │   │   └── index.ts           # Electron main process (window, file watching, IPC)
 │   ├── preload/
@@ -21,18 +26,25 @@ brett-rad-preview-tool/
 │   └── renderer/
 │       ├── index.html         # Vite entry HTML
 │       └── src/
-│           ├── main.tsx       # React entry point
-│           ├── App.tsx        # Root component (state, IPC, keyboard shortcuts)
+│           ├── main.tsx       # React entry point (Temporal polyfill)
+│           ├── App.tsx        # Root component (useReducer, IPC, keyboard shortcuts)
 │           ├── App.css        # Tailwind + theme CSS variables
-│           ├── types.ts       # Shared interfaces (AppConfig, FileData, Tab)
+│           ├── env.d.ts       # Global type declarations (Temporal)
+│           ├── types.ts       # Re-exports shared types + renderer-only Tab interface
+│           ├── tabsReducer.ts # useReducer for tabs + activeIndex
+│           ├── groupTabs.ts   # Groups tabs by containerFolders
+│           ├── classNames.ts  # Utility for conditional class strings
+│           ├── platform.ts    # Platform detection helpers
 │           ├── useThemeStyles.ts  # Theme stylesheet toggling hook
 │           └── components/
 │               ├── Sidebar.tsx
 │               ├── TabItem.tsx
 │               ├── ContentArea.tsx
-│               └── StatusBar.tsx
+│               ├── TopBar.tsx         # Content width mode/value controls
+│               ├── StatusBar.tsx
+│               └── ui-elements/
+│                   └── SegmentedControl.tsx
 ├── out/                       # Build output (gitignored)
-├── config.json                # Persisted settings (theme, last-open files) — auto-generated
 ├── icon.icns                  # macOS app icon
 └── icon.iconset/              # Source PNGs for the icon
 ```
@@ -61,8 +73,11 @@ Uses `electron-builder` (config in `electron-builder.yml`). The app is unsigned 
 - **File watching**: chokidar in the main process, sends updates via IPC.
 - **Markdown rendering in preload**: The renderer has `contextIsolation: true` and no Node access. Rendering (marked + highlight.js) lives in the preload script which exposes `mdview.renderMarkdown()` to the renderer.
 - **Theme**: Two themes (light/dark) via `data-theme` attribute on `<body>`. Theme stylesheets (github-markdown-css, highlight.js) are imported as raw CSS and toggled via `<style disabled>` elements in the `useThemeStyles` hook.
-- **Session restore**: Open files are persisted to `config.json` and restored on next launch.
+- **Session restore**: Open files are persisted to `~/.brpt/brpt-config.json` and restored on next launch. Config path can be overridden with `BRPT_CONFIG` env var.
 - **Temporal polyfill**: `@js-temporal/polyfill` is loaded as a true polyfill in `main.tsx` and assigned to `globalThis`. Global types are declared in `env.d.ts`. Use `Temporal` directly anywhere in the renderer — do not import the polyfill per-file. Do not use `Date`.
+- **Tab state**: `useReducer` in `App.tsx` manages tabs + activeIndex atomically via `tabsReducer.ts`. Actions: `OPEN_FILE`, `CLOSE_TAB`, `ACTIVATE_TAB`, `FILE_UPDATED`.
+- **Tab grouping**: `containerFolders` in config define project roots. Tabs whose paths fall under a root are grouped in the sidebar. Others appear under "Ungrouped".
+- **brpt CLI**: Shell script in `resources/brpt`, symlinked to `/usr/local/bin/brpt` on install. Supports dev-mode forwarding — reads `brpt_development_roots` from config, detects running `electron-vite dev` instances via `pgrep`, and forwards files using `open -a` with the dev Electron.app. Falls back to the packaged app when no dev instance is running.
 
 ## Expected Behaviors
 

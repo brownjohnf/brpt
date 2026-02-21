@@ -49,7 +49,8 @@ Settings are stored in `~/.brpt/brpt-config.json`. The file is created automatic
     "mode": "fixed",
     "fixedWidth": "880px",
     "cappedWidth": "1200px"
-  }
+  },
+  "brpt_development_roots": ["~/Projects/Minca/brett-rad-preview-tool"]
 }
 ```
 
@@ -57,6 +58,7 @@ Settings are stored in `~/.brpt/brpt-config.json`. The file is created automatic
 - **openFiles** — session restore; tracks which files were open when the app last closed
 - **containerFolders** — paths used to group tabs in the sidebar by project. Supports `~` expansion.
 - **contentWidth** — controls the content area max-width. Mode is `"fixed"`, `"capped"`, or `"full"`, with customizable width values.
+- **brpt_development_roots** — list of project directory paths. When `brpt` is run, it checks if an `electron-vite dev` instance is running from any of these roots and forwards files to it instead of the packaged app.
 
 The config path can be overridden with the `BRPT_CONFIG` environment variable. Note: environment variables set in shell profiles (`.zshrc`, etc.) are only available when launching via the `brpt` CLI. macOS GUI launches (Finder, Dock) do not inherit shell environment variables.
 
