@@ -6,8 +6,8 @@ body,
 #root {
   height: 100%;
   overflow: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial,
-    sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
 }
 
 /* Light theme (default) */
@@ -31,6 +31,8 @@ body[data-theme="light"] {
   --btn-text: #57606a;
   --seg-active-bg: #eaeef2;
   --seg-active-text: #24292f;
+  --tab-changed-dot: #0969da;
+  --status-glow: #0969da;
 }
 
 /* Dark theme */
@@ -54,6 +56,8 @@ body[data-theme="dark"] {
   --btn-text: #8b949e;
   --seg-active-bg: #30363d;
   --seg-active-text: #e6edf3;
+  --tab-changed-dot: #58a6ff;
+  --status-glow: #58a6ff;
 }
 
 * {

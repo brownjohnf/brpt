@@ -1,7 +1,7 @@
-import type { MdviewApi } from "./index"
+import type { MdviewApi } from "./index";
 
 declare global {
   interface Window {
-    mdview: MdviewApi
+    mdview: MdviewApi;
   }
 }

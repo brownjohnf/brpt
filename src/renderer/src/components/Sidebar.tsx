@@ -1,24 +1,24 @@
-import { useState, useCallback, useMemo, useRef, useReducer } from "react"
-import type { Tab } from "../types"
-import { classNames } from "../classNames"
-import { groupTabs } from "../groupTabs"
-import { TabItem } from "./TabItem"
+import { useCallback, useMemo, useReducer, useRef, useState } from "react";
+import { classNames } from "../classNames";
+import { groupTabs } from "../groupTabs";
+import type { Tab } from "../types";
+import { TabItem } from "./TabItem";
 
 interface SidebarProps {
-  tabs: Tab[]
-  activeIndex: number
-  containerFolders: string[]
-  width: number
-  onActivateTab: (index: number) => void
-  onCloseTab: (index: number) => void
-  onOpenDialog: () => void
-  onToggleTheme: () => void
-  onDrop: (e: React.DragEvent) => void
-  onResize: (width: number) => void
+  tabs: Tab[];
+  activeIndex: number;
+  containerFolders: string[];
+  width: number;
+  onActivateTab: (index: number) => void;
+  onCloseTab: (index: number) => void;
+  onOpenDialog: () => void;
+  onToggleTheme: () => void;
+  onDrop: (e: React.DragEvent) => void;
+  onResize: (width: number) => void;
 }
 
-const MIN_WIDTH = 120
-const MAX_WIDTH = 400
+const MIN_WIDTH = 120;
+const MAX_WIDTH = 400;
 
 export function Sidebar({
   tabs,
@@ -32,72 +32,75 @@ export function Sidebar({
   onDrop,
   onResize,
 }: SidebarProps): JSX.Element {
-  const [dragOver, setDragOver] = useState(false)
-  const dragging = useRef(false)
+  const [dragOver, setDragOver] = useState(false);
+  const dragging = useRef(false);
 
   const { grouped, ungrouped } = useMemo(
     () => groupTabs(tabs, containerFolders),
-    [tabs, containerFolders],
-  )
+    [tabs, containerFolders]
+  );
 
   const [collapsed, toggleCollapsed] = useReducer(
     (state: Record<string, boolean>, name: string) => ({
       ...state,
       [name]: !state[name],
     }),
-    {} as Record<string, boolean>,
-  )
+    {} as Record<string, boolean>
+  );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     if (e.dataTransfer) {
-      e.dataTransfer.dropEffect = "copy"
+      e.dataTransfer.dropEffect = "copy";
     }
-    setDragOver(true)
-  }, [])
+    setDragOver(true);
+  }, []);
 
   const handleDragLeave = useCallback(() => {
-    setDragOver(false)
-  }, [])
+    setDragOver(false);
+  }, []);
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
-      setDragOver(false)
-      onDrop(e)
+      setDragOver(false);
+      onDrop(e);
     },
-    [onDrop],
-  )
+    [onDrop]
+  );
 
   const handleResizeStart = useCallback(
     (e: React.MouseEvent) => {
-      e.preventDefault()
-      dragging.current = true
-      const startX = e.clientX
-      const startWidth = width
+      e.preventDefault();
+      dragging.current = true;
+      const startX = e.clientX;
+      const startWidth = width;
 
       function onMouseMove(e: MouseEvent): void {
         if (!dragging.current) {
-          return
+          return;
         }
-        const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth + (e.clientX - startX)))
-        onResize(newWidth)
+        const newWidth = Math.min(
+          MAX_WIDTH,
+          Math.max(MIN_WIDTH, startWidth + (e.clientX - startX))
+        );
+        onResize(newWidth);
       }
 
       function onMouseUp(): void {
-        dragging.current = false
-        document.removeEventListener("mousemove", onMouseMove)
-        document.removeEventListener("mouseup", onMouseUp)
-        document.body.style.cursor = ""
-        document.body.style.userSelect = ""
+        dragging.current = false;
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
       }
 
-      document.body.style.cursor = "col-resize"
-      document.body.style.userSelect = "none"
-      document.addEventListener("mousemove", onMouseMove)
-      document.addEventListener("mouseup", onMouseUp)
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
     },
-    [width, onResize],
-  )
+    [width, onResize]
+  );
 
   return (
     <div className="flex" style={{ width }}>
@@ -105,7 +108,7 @@ export function Sidebar({
         className={classNames(
           "flex-1 flex flex-col overflow-hidden",
           "bg-[var(--sidebar-bg)]",
-          dragOver && "bg-[var(--tab-hover-bg)]",
+          dragOver && "bg-[var(--tab-hover-bg)]"
         )}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -122,12 +125,16 @@ export function Sidebar({
                   "px-2 py-1 mt-1 mb-0.5 text-[11px] font-semibold tracking-wide",
                   "text-[var(--tab-text)] opacity-60",
                   "bg-transparent border-none cursor-pointer",
-                  "hover:opacity-100",
+                  "hover:opacity-100"
                 )}
               >
                 <span
                   className="text-[9px] inline-block transition-transform"
-                  style={{ transform: collapsed[group.name] ? "rotate(-90deg)" : "rotate(0deg)" }}
+                  style={{
+                    transform: collapsed[group.name]
+                      ? "rotate(-90deg)"
+                      : "rotate(0deg)",
+                  }}
                 >
                   ▼
                 </span>
@@ -156,12 +163,16 @@ export function Sidebar({
                   "px-2 py-1 mt-1 mb-0.5 text-[11px] font-semibold tracking-wide",
                   "text-[var(--tab-text)] opacity-60",
                   "bg-transparent border-none cursor-pointer",
-                  "hover:opacity-100",
+                  "hover:opacity-100"
                 )}
               >
                 <span
                   className="text-[9px] inline-block transition-transform"
-                  style={{ transform: collapsed["__ungrouped__"] ? "rotate(-90deg)" : "rotate(0deg)" }}
+                  style={{
+                    transform: collapsed["__ungrouped__"]
+                      ? "rotate(-90deg)"
+                      : "rotate(0deg)",
+                  }}
                 >
                   ▼
                 </span>
@@ -187,7 +198,7 @@ export function Sidebar({
             className={classNames(
               "bg-[var(--btn-bg)] border-none text-[var(--btn-text)] cursor-pointer",
               "text-lg w-8 h-8 rounded-md flex items-center justify-center",
-              "hover:bg-[var(--btn-hover-bg)]",
+              "hover:bg-[var(--btn-hover-bg)]"
             )}
           >
             +
@@ -198,7 +209,7 @@ export function Sidebar({
             className={classNames(
               "bg-[var(--btn-bg)] border-none text-[var(--btn-text)] cursor-pointer",
               "text-lg w-8 h-8 rounded-md flex items-center justify-center",
-              "hover:bg-[var(--btn-hover-bg)]",
+              "hover:bg-[var(--btn-hover-bg)]"
             )}
           >
             &#9680;
@@ -210,10 +221,10 @@ export function Sidebar({
           "w-1 cursor-col-resize shrink-0 bg-[var(--sidebar-bg)]",
           "border-x border-[var(--sidebar-border)]",
           "hover:bg-[var(--tab-hover-bg)]",
-          "active:bg-[var(--tab-hover-bg)]",
+          "active:bg-[var(--tab-hover-bg)]"
         )}
         onMouseDown={handleResizeStart}
       />
     </div>
-  )
+  );
 }

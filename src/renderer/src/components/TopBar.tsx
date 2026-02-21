@@ -1,76 +1,81 @@
-import { useState, useCallback, useEffect } from "react"
-import type { ContentWidthMode } from "../types"
-import { classNames } from "../classNames"
-import { SegmentedControl } from "./ui-elements/SegmentedControl"
+import { useCallback, useEffect, useState } from "react";
+import { classNames } from "../classNames";
+import type { ContentWidthMode } from "../types";
+import { SegmentedControl } from "./ui-elements/SegmentedControl";
 
 interface TopBarProps {
-  mode: ContentWidthMode
-  widthValue: string
-  onChangeMode: (mode: ContentWidthMode) => void
-  onChangeWidthValue: (value: string) => void
+  mode: ContentWidthMode;
+  widthValue: string;
+  onChangeMode: (mode: ContentWidthMode) => void;
+  onChangeWidthValue: (value: string) => void;
 }
 
 const modeOptions: { value: ContentWidthMode; label: string }[] = [
   { value: "fixed", label: "Fixed" },
   { value: "capped", label: "Capped" },
   { value: "full", label: "Full" },
-]
+];
 
-const validUnits = ["px", "pt", "rem", "em", "ch", "vw", "vh"]
+const validUnits = ["px", "pt", "rem", "em", "ch", "vw", "vh"];
 
 function normalizeCssWidth(input: string): string | null {
-  const trimmed = input.trim()
+  const trimmed = input.trim();
   if (trimmed === "") {
-    return null
+    return null;
   }
 
   if (trimmed.includes("%")) {
-    return null
+    return null;
   }
 
   if (/^\d+(\.\d+)?$/.test(trimmed)) {
-    return `${trimmed}px`
+    return `${trimmed}px`;
   }
 
-  const match = trimmed.match(/^(\d+(?:\.\d+)?)\s*([\w]+)$/)
+  const match = trimmed.match(/^(\d+(?:\.\d+)?)\s*([\w]+)$/);
   if (match && validUnits.includes(match[2])) {
-    return `${match[1]}${match[2]}`
+    return `${match[1]}${match[2]}`;
   }
 
-  return null
+  return null;
 }
 
-export function TopBar({ mode, widthValue, onChangeMode, onChangeWidthValue }: TopBarProps): JSX.Element {
-  const [draft, setDraft] = useState(widthValue)
-  const showInput = mode !== "full"
+export function TopBar({
+  mode,
+  widthValue,
+  onChangeMode,
+  onChangeWidthValue,
+}: TopBarProps): JSX.Element {
+  const [draft, setDraft] = useState(widthValue);
+  const showInput = mode !== "full";
 
   useEffect(() => {
-    setDraft(widthValue)
-  }, [widthValue])
+    setDraft(widthValue);
+  }, [widthValue]);
 
   const commitValue = useCallback(() => {
-    const normalized = normalizeCssWidth(draft)
+    const normalized = normalizeCssWidth(draft);
     if (normalized) {
-      setDraft(normalized)
-      onChangeWidthValue(normalized)
+      setDraft(normalized);
+      onChangeWidthValue(normalized);
     } else {
-      setDraft(widthValue)
+      setDraft(widthValue);
     }
-  }, [draft, widthValue, onChangeWidthValue])
+  }, [draft, widthValue, onChangeWidthValue]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter") {
-        commitValue()
-        ;(e.target as HTMLInputElement).blur()
+        commitValue();
+        (e.target as HTMLInputElement).blur();
       }
       if (e.key === "Escape") {
-        setDraft(widthValue)
-        ;(e.target as HTMLInputElement).blur()
+        setDraft(widthValue);
+        (e.target as HTMLInputElement).blur();
       }
     },
-    [commitValue, widthValue],
-  )
+    [commitValue, widthValue]
+  );
 
   return (
     <div
@@ -88,11 +93,15 @@ export function TopBar({ mode, widthValue, onChangeMode, onChangeWidthValue }: T
             "w-20 px-2 py-0.5 text-[11px] rounded-md",
             "bg-[var(--sidebar-bg)] text-[var(--tab-active-text)]",
             "border border-[var(--sidebar-border)]",
-            "outline-none focus:border-[var(--tab-active-text)]",
+            "outline-none focus:border-[var(--tab-active-text)]"
           )}
         />
       )}
-      <SegmentedControl options={modeOptions} value={mode} onChange={onChangeMode} />
+      <SegmentedControl
+        options={modeOptions}
+        value={mode}
+        onChange={onChangeMode}
+      />
     </div>
-  )
+  );
 }

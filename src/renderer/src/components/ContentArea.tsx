@@ -1,27 +1,27 @@
-import { forwardRef, useMemo } from "react"
-import type { Tab } from "../types"
+import { forwardRef, useMemo } from "react";
+import type { Tab } from "../types";
 
-const { mdview } = window
+const { mdview } = window;
 
 interface ContentAreaProps {
-  activeTab: Tab | null
-  maxWidth: string | undefined
-  onDrop: (e: React.DragEvent) => void
+  activeTab: Tab | null;
+  maxWidth: string | undefined;
+  onDrop: (e: React.DragEvent) => void;
 }
 
 export const ContentArea = forwardRef<HTMLDivElement, ContentAreaProps>(
   function ContentArea({ activeTab, maxWidth, onDrop }, ref) {
     const renderedHtml = useMemo(() => {
       if (!activeTab) {
-        return ""
+        return "";
       }
-      return mdview.renderMarkdown(activeTab.content)
-    }, [activeTab?.content]) // eslint-disable-line react-hooks/exhaustive-deps
+      return mdview.renderMarkdown(activeTab.content);
+    }, [activeTab?.content]); // eslint-disable-line react-hooks/exhaustive-deps
 
     function handleDragOver(e: React.DragEvent): void {
-      e.preventDefault()
+      e.preventDefault();
       if (e.dataTransfer) {
-        e.dataTransfer.dropEffect = "copy"
+        e.dataTransfer.dropEffect = "copy";
       }
     }
 
@@ -46,12 +46,16 @@ export const ContentArea = forwardRef<HTMLDivElement, ContentAreaProps>(
           >
             <p className="text-lg font-semibold">No files open</p>
             <p className="text-sm">
-              Drop a <code className="bg-[var(--sidebar-bg)] px-1.5 py-0.5 rounded text-[13px]">.md</code> file
-              here, click <strong>+</strong>, or pass files as CLI arguments
+              Drop a{" "}
+              <code className="bg-[var(--sidebar-bg)] px-1.5 py-0.5 rounded text-[13px]">
+                .md
+              </code>{" "}
+              file here, click <strong>+</strong>, or pass files as CLI
+              arguments
             </p>
           </div>
         )}
       </div>
-    )
-  },
-)
+    );
+  }
+);

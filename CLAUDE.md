@@ -62,6 +62,7 @@ Uses `electron-builder` (config in `electron-builder.yml`). The app is unsigned 
 - **Markdown rendering in preload**: The renderer has `contextIsolation: true` and no Node access. Rendering (marked + highlight.js) lives in the preload script which exposes `mdview.renderMarkdown()` to the renderer.
 - **Theme**: Two themes (light/dark) via `data-theme` attribute on `<body>`. Theme stylesheets (github-markdown-css, highlight.js) are imported as raw CSS and toggled via `<style disabled>` elements in the `useThemeStyles` hook.
 - **Session restore**: Open files are persisted to `config.json` and restored on next launch.
+- **Temporal polyfill**: `@js-temporal/polyfill` is loaded as a true polyfill in `main.tsx` and assigned to `globalThis`. Global types are declared in `env.d.ts`. Use `Temporal` directly anywhere in the renderer — do not import the polyfill per-file. Do not use `Date`.
 
 ## Expected Behaviors
 

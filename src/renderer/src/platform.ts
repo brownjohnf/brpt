@@ -1,1 +1,1 @@
-export const homedir = window.mdview.homedir
+export const homedir = window.mdview.homedir;
