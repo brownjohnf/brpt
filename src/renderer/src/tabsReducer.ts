@@ -9,7 +9,9 @@ export type TabsAction =
   | { type: "OPEN_FILE"; data: FileData }
   | { type: "CLOSE_TAB"; index: number }
   | { type: "ACTIVATE_TAB"; index: number; currentScrollTop: number }
-  | { type: "FILE_UPDATED"; data: FileData };
+  | { type: "FILE_UPDATED"; data: FileData }
+  | { type: "FILE_REMOVED"; path: string }
+  | { type: "REORDER_TAB"; fromIndex: number; toIndex: number };
 
 export const initialTabsState: TabsState = {
   tabs: [],
@@ -23,7 +25,7 @@ export function tabsReducer(state: TabsState, action: TabsAction): TabsState {
       const existing = state.tabs.findIndex((t) => t.path === data.path);
       if (existing !== -1) {
         const tabs = [...state.tabs];
-        tabs[existing] = { ...tabs[existing], content: data.content };
+        tabs[existing] = { ...tabs[existing], content: data.content, removed: false };
         return { tabs, activeIndex: existing };
       }
       const newTab: Tab = {
@@ -94,6 +96,40 @@ export function tabsReducer(state: TabsState, action: TabsAction): TabsState {
         hasUnseenChanges: index !== state.activeIndex,
       };
       return { tabs, activeIndex: state.activeIndex };
+    }
+
+    case "FILE_REMOVED": {
+      const index = state.tabs.findIndex((t) => t.path === action.path);
+      if (index === -1) {
+        return state;
+      }
+      const tabs = [...state.tabs];
+      tabs[index] = { ...tabs[index], removed: true };
+      return { tabs, activeIndex: state.activeIndex };
+    }
+
+    case "REORDER_TAB": {
+      const { fromIndex, toIndex } = action;
+      if (
+        fromIndex === toIndex ||
+        fromIndex < 0 || fromIndex >= state.tabs.length ||
+        toIndex < 0 || toIndex >= state.tabs.length
+      ) {
+        return state;
+      }
+      const tabs = [...state.tabs];
+      const [moved] = tabs.splice(fromIndex, 1);
+      tabs.splice(toIndex, 0, moved);
+
+      let activeIndex = state.activeIndex;
+      if (state.activeIndex === fromIndex) {
+        activeIndex = toIndex;
+      } else if (fromIndex < state.activeIndex && toIndex >= state.activeIndex) {
+        activeIndex = state.activeIndex - 1;
+      } else if (fromIndex > state.activeIndex && toIndex <= state.activeIndex) {
+        activeIndex = state.activeIndex + 1;
+      }
+      return { tabs, activeIndex };
     }
   }
 }

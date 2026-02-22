@@ -9,6 +9,7 @@ export type { AppConfig, FileData };
 export interface MdviewApi {
   renderMarkdown(text: string): string;
   onFileUpdated(callback: (data: FileData) => void): () => void;
+  onFileRemoved(callback: (data: { path: string }) => void): () => void;
   onFilesFromArgs(callback: (files: FileData[]) => void): () => void;
   onConfigLoaded(callback: (config: AppConfig) => void): () => void;
   openFileDialog(): Promise<FileData[]>;
@@ -42,6 +43,16 @@ const api: MdviewApi = {
     ipcRenderer.on("file-updated", listener);
     return () => {
       ipcRenderer.removeListener("file-updated", listener);
+    };
+  },
+  onFileRemoved: (callback: (data: { path: string }) => void) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      data: { path: string },
+    ): void => callback(data);
+    ipcRenderer.on("file-removed", listener);
+    return () => {
+      ipcRenderer.removeListener("file-removed", listener);
     };
   },
   onFilesFromArgs: (callback: (files: FileData[]) => void) => {

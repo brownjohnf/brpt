@@ -1,6 +1,6 @@
 import { is } from "@electron-toolkit/utils";
 import { FSWatcher, watch } from "chokidar";
-import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, screen, shell } from "electron";
 import fs from "fs";
 import os from "os";
 import { dirname, join, resolve } from "path";
@@ -69,6 +69,12 @@ function watchFile(filePath: string): void {
       mainWindow.webContents.send("file-updated", { path: abs, ...file });
     }
   });
+  watcher.on("unlink", () => {
+    unwatchFile(abs);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("file-removed", { path: abs });
+    }
+  });
   watchers.set(abs, watcher);
 }
 
@@ -120,10 +126,28 @@ function openFilesAndSend(filePaths: string[]): void {
   }
 }
 
+function boundsOverlapDisplay(bounds: { x: number; y: number; width: number; height: number }): boolean {
+  const displays = screen.getAllDisplays();
+  return displays.some((display) => {
+    const { x, y, width, height } = display.bounds;
+    return (
+      bounds.x < x + width &&
+      bounds.x + bounds.width > x &&
+      bounds.y < y + height &&
+      bounds.y + bounds.height > y
+    );
+  });
+}
+
 function createWindow(): void {
+  const config = loadConfig();
+  const saved = config.windowBounds;
+  const useSaved = saved && boundsOverlapDisplay(saved);
+
   mainWindow = new BrowserWindow({
-    width: 1000,
-    height: 700,
+    width: useSaved ? saved.width : 1000,
+    height: useSaved ? saved.height : 700,
+    ...(useSaved ? { x: saved.x, y: saved.y } : {}),
     title: "Brett's Rad Preview Tool",
     webPreferences: {
       preload: join(__dirname, "../preload/index.mjs"),
@@ -131,6 +155,33 @@ function createWindow(): void {
       nodeIntegration: false,
       sandbox: false,
     },
+  });
+
+  let boundsTimer: ReturnType<typeof setTimeout> | null = null;
+  function saveBounds(): void {
+    if (boundsTimer) {
+      clearTimeout(boundsTimer);
+    }
+    boundsTimer = setTimeout(() => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        const cfg = loadConfig();
+        cfg.windowBounds = mainWindow.getBounds();
+        saveConfig(cfg);
+      }
+    }, 500);
+  }
+  mainWindow.on("resize", saveBounds);
+  mainWindow.on("move", saveBounds);
+
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: "deny" };
+  });
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    if (url !== mainWindow!.webContents.getURL()) {
+      event.preventDefault();
+      shell.openExternal(url);
+    }
   });
 
   if (is.dev && process.env["ELECTRON_RENDERER_URL"]) {

@@ -15,6 +15,7 @@ interface SidebarProps {
   onToggleTheme: () => void;
   onDrop: (e: React.DragEvent) => void;
   onResize: (width: number) => void;
+  onReorderTab: (fromIndex: number, toIndex: number) => void;
 }
 
 const MIN_WIDTH = 120;
@@ -31,6 +32,7 @@ export function Sidebar({
   onToggleTheme,
   onDrop,
   onResize,
+  onReorderTab,
 }: SidebarProps): JSX.Element {
   const [dragOver, setDragOver] = useState(false);
   const dragging = useRef(false);
@@ -145,10 +147,12 @@ export function Sidebar({
                   <TabItem
                     key={tab.path}
                     tab={tab}
+                    index={index}
                     isActive={index === activeIndex}
                     groupRootPath={group.rootPath}
                     onClick={() => onActivateTab(index)}
                     onClose={() => onCloseTab(index)}
+                    onReorderTab={onReorderTab}
                   />
                 ))}
             </div>
@@ -183,9 +187,11 @@ export function Sidebar({
                   <TabItem
                     key={tab.path}
                     tab={tab}
+                    index={index}
                     isActive={index === activeIndex}
                     onClick={() => onActivateTab(index)}
                     onClose={() => onCloseTab(index)}
+                    onReorderTab={onReorderTab}
                   />
                 ))}
             </div>

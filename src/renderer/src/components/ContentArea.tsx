@@ -7,10 +7,11 @@ interface ContentAreaProps {
   activeTab: Tab | null;
   contentWidth: ContentWidthConfig;
   onDrop: (e: React.DragEvent) => void;
+  onRetryRemoved: (path: string) => void;
 }
 
 export const ContentArea = forwardRef<HTMLDivElement, ContentAreaProps>(
-  function ContentArea({ activeTab, contentWidth, onDrop }, ref) {
+  function ContentArea({ activeTab, contentWidth, onDrop, onRetryRemoved }, ref) {
     const renderedHtml = useMemo(() => {
       if (!activeTab) {
         return "";
@@ -48,11 +49,35 @@ export const ContentArea = forwardRef<HTMLDivElement, ContentAreaProps>(
         onDrop={onDrop}
       >
         {activeTab ? (
-          <div
-            className="markdown-body mx-auto"
-            style={contentStyle}
-            dangerouslySetInnerHTML={{ __html: renderedHtml }}
-          />
+          <>
+            {activeTab.removed && (
+              <div
+                className="mx-auto mb-4 px-3 py-2 rounded text-sm"
+                style={{
+                  ...contentStyle,
+                  background: "var(--tab-hover-bg)",
+                  color: "var(--status-text)",
+                }}
+              >
+                This file has been deleted or moved.
+                <button
+                  className="ml-2 px-2 py-0.5 rounded text-[13px] cursor-pointer border-none"
+                  style={{
+                    background: "var(--sidebar-border)",
+                    color: "var(--tab-active-text)",
+                  }}
+                  onClick={() => onRetryRemoved(activeTab.path)}
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+            <div
+              className="markdown-body mx-auto"
+              style={contentStyle}
+              dangerouslySetInnerHTML={{ __html: renderedHtml }}
+            />
+          </>
         ) : (
           <div
             className="flex flex-col items-center justify-center h-full text-center gap-2"

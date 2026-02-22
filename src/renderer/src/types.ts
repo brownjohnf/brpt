@@ -11,4 +11,5 @@ export interface Tab extends FileData {
   scrollTop: number;
   lastModifiedAt: Temporal.Instant | null;
   hasUnseenChanges: boolean;
+  removed?: boolean;
 }
