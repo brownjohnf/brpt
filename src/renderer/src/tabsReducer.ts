@@ -29,6 +29,7 @@ export function tabsReducer(state: TabsState, action: TabsAction): TabsState {
         return { tabs, activeIndex: existing };
       }
       const newTab: Tab = {
+        kind: "markdown",
         path: data.path,
         content: data.content,
         mtimeMs: data.mtimeMs,

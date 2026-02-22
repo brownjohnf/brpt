@@ -4,6 +4,10 @@ import { QuickGoto } from "./components/QuickGoto";
 import { Sidebar } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
 import { TopBar } from "./components/TopBar";
+import {
+  MarkdownContent,
+  MarkdownTopBarContent,
+} from "./components/viewers/MarkdownViewer";
 import { initialTabsState, tabsReducer } from "./tabsReducer";
 import type {
   AppConfig,
@@ -12,7 +16,6 @@ import type {
   FileData,
 } from "./types";
 import { groupTabs } from "./groupTabs";
-import { useCurrentHeading } from "./useCurrentHeading";
 import { useThemeStyles } from "./useThemeStyles";
 
 const { mdview } = window;
@@ -307,8 +310,6 @@ export default function App(): JSX.Element {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [activeIndex, tabs, containerFolders, closeTab, handleOpenDialog, activateTab, openFile]);
 
-  const currentHeading = useCurrentHeading(mainRef, activeTab?.content);
-
   // Apply theme to document and toggle stylesheets
   useThemeStyles(theme);
   useEffect(() => {
@@ -336,24 +337,30 @@ export default function App(): JSX.Element {
           onReorderTab={reorderTab}
         />
         <div className="flex-1 flex flex-col overflow-hidden">
-          <TopBar
-            currentHeading={currentHeading}
-            mode={contentWidth.mode}
-            widthValue={
-              contentWidth.mode === "fixed"
-                ? contentWidth.fixedWidth
-                : contentWidth.cappedWidth
-            }
-            onChangeMode={changeContentWidthMode}
-            onChangeWidthValue={changeContentWidthValue}
-          />
+          <TopBar>
+            {activeTab?.kind === "markdown" && (
+              <MarkdownTopBarContent
+                scrollRef={mainRef}
+                content={activeTab.content}
+                contentWidth={contentWidth}
+                onChangeMode={changeContentWidthMode}
+                onChangeWidthValue={changeContentWidthValue}
+              />
+            )}
+          </TopBar>
           <ContentArea
             ref={mainRef}
             activeTab={activeTab}
-            contentWidth={contentWidth}
             onDrop={handleDrop}
-            onRetryRemoved={handleRetryRemoved}
-          />
+          >
+            {activeTab?.kind === "markdown" && (
+              <MarkdownContent
+                tab={activeTab}
+                contentWidth={contentWidth}
+                onRetryRemoved={handleRetryRemoved}
+              />
+            )}
+          </ContentArea>
         </div>
       </div>
       <StatusBar
