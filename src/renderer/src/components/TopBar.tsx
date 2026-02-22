@@ -4,6 +4,7 @@ import type { ContentWidthMode } from "../types";
 import { SegmentedControl } from "./ui-elements/SegmentedControl";
 
 interface TopBarProps {
+  currentHeading: string[];
   mode: ContentWidthMode;
   widthValue: string;
   onChangeMode: (mode: ContentWidthMode) => void;
@@ -41,6 +42,7 @@ function normalizeCssWidth(input: string): string | null {
 }
 
 export function TopBar({
+  currentHeading,
   mode,
   widthValue,
   onChangeMode,
@@ -79,29 +81,41 @@ export function TopBar({
 
   return (
     <div
-      className="flex items-center justify-end gap-2 px-4 py-1 shrink-0 border-b border-[var(--sidebar-border)]"
+      className="flex items-center justify-between gap-2 px-4 py-1 shrink-0 border-b border-[var(--sidebar-border)]"
       style={{ background: "var(--sidebar-bg)" }}
     >
-      {showInput && (
-        <input
-          type="text"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commitValue}
-          onKeyDown={handleKeyDown}
-          className={classNames(
-            "w-20 px-2 py-0.5 text-[11px] rounded-md",
-            "bg-[var(--sidebar-bg)] text-[var(--tab-active-text)]",
-            "border border-[var(--sidebar-border)]",
-            "outline-none focus:border-[var(--tab-active-text)]"
-          )}
+      <div className="text-[11px] text-[var(--tab-text)] truncate min-w-0">
+        {currentHeading.map((text, i) => (
+          <span key={i}>
+            {i > 0 && (
+              <span className="mx-1 opacity-40">&rsaquo;</span>
+            )}
+            {text}
+          </span>
+        ))}
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        {showInput && (
+          <input
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commitValue}
+            onKeyDown={handleKeyDown}
+            className={classNames(
+              "w-20 px-2 py-0.5 text-[11px] rounded-md",
+              "bg-[var(--sidebar-bg)] text-[var(--tab-active-text)]",
+              "border border-[var(--sidebar-border)]",
+              "outline-none focus:border-[var(--tab-active-text)]"
+            )}
+          />
+        )}
+        <SegmentedControl
+          options={modeOptions}
+          value={mode}
+          onChange={onChangeMode}
         />
-      )}
-      <SegmentedControl
-        options={modeOptions}
-        value={mode}
-        onChange={onChangeMode}
-      />
+      </div>
     </div>
   );
 }

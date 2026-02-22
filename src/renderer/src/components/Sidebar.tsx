@@ -176,7 +176,7 @@ export function Sidebar({
                 >
                   ▼
                 </span>
-                Ungrouped
+                ungrouped
               </button>
               {!collapsed["__ungrouped__"] &&
                 ungrouped.map(({ tab, index }) => (

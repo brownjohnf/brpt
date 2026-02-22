@@ -10,6 +10,7 @@ import type {
   ContentWidthMode,
   FileData,
 } from "./types";
+import { useCurrentHeading } from "./useCurrentHeading";
 import { useThemeStyles } from "./useThemeStyles";
 
 const { mdview } = window;
@@ -160,6 +161,8 @@ export default function App(): JSX.Element {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [activeIndex, closeTab, handleOpenDialog]);
 
+  const currentHeading = useCurrentHeading(mainRef, activeTab?.content);
+
   // Apply theme to document and toggle stylesheets
   useThemeStyles(theme);
   useEffect(() => {
@@ -187,6 +190,7 @@ export default function App(): JSX.Element {
         />
         <div className="flex-1 flex flex-col overflow-hidden">
           <TopBar
+            currentHeading={currentHeading}
             mode={contentWidth.mode}
             widthValue={
               contentWidth.mode === "fixed"
