@@ -3,6 +3,7 @@ import { classNames } from "../classNames";
 import type { Tab } from "../types";
 
 const TAB_MIME = "application/x-brpt-tab";
+const TAB_GROUP_MIME = "application/x-brpt-tab-group";
 
 type DropPosition = "above" | "below" | null;
 
@@ -50,12 +51,15 @@ export function TabItem({
   const [dropPosition, setDropPosition] = useState<DropPosition>(null);
   const divRef = useRef<HTMLDivElement>(null);
 
+  const groupKey = groupRootPath ?? "__ungrouped__";
+
   const handleDragStart = useCallback(
     (e: React.DragEvent) => {
       e.dataTransfer.setData(TAB_MIME, String(index));
+      e.dataTransfer.setData(TAB_GROUP_MIME, groupKey);
       e.dataTransfer.effectAllowed = "move";
     },
-    [index],
+    [index, groupKey],
   );
 
   const handleDragOver = useCallback(
@@ -82,7 +86,8 @@ export function TabItem({
     (e: React.DragEvent) => {
       setDropPosition(null);
       const fromStr = e.dataTransfer.getData(TAB_MIME);
-      if (!fromStr) {
+      const fromGroup = e.dataTransfer.getData(TAB_GROUP_MIME);
+      if (!fromStr || fromGroup !== groupKey) {
         return;
       }
       const fromIndex = parseInt(fromStr, 10);
@@ -97,7 +102,7 @@ export function TabItem({
       }
       onReorderTab(fromIndex, toIndex);
     },
-    [index, onReorderTab],
+    [index, groupKey, onReorderTab],
   );
 
   const handleDragEnd = useCallback(() => {

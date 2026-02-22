@@ -119,12 +119,12 @@ export function QuickGoto({
           className="w-full px-3 py-2 text-sm bg-transparent border-none outline-none"
           style={{ color: "var(--tab-active-text)" }}
         />
-        {filtered.length > 0 && (
-          <div
-            className="max-h-[300px] overflow-y-auto"
-            style={{ borderTop: "1px solid var(--sidebar-border)" }}
-          >
-            {filtered.map(({ tab, index }, i) => (
+        <div
+          className="max-h-[300px] overflow-y-auto"
+          style={{ borderTop: "1px solid var(--sidebar-border)" }}
+        >
+          {filtered.length > 0 ? (
+            filtered.map(({ tab, index }, i) => (
               <div
                 key={tab.path}
                 className={classNames(
@@ -147,9 +147,16 @@ export function QuickGoto({
                   {getDirectory(tab.path)}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+            ))
+          ) : query.trim() !== "" ? (
+            <div
+              className="px-3 py-2 text-[13px]"
+              style={{ color: "var(--tab-text)" }}
+            >
+              No matching tabs
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );

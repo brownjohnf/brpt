@@ -109,9 +109,15 @@ export default function App(): JSX.Element {
     [],
   );
 
+  const sidebarSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleSidebarResize = useCallback((width: number) => {
     setSidebarWidth(width);
-    mdview.setConfig("sidebarWidth", width);
+    if (sidebarSaveTimer.current) {
+      clearTimeout(sidebarSaveTimer.current);
+    }
+    sidebarSaveTimer.current = setTimeout(() => {
+      mdview.setConfig("sidebarWidth", width);
+    }, 300);
   }, []);
 
   const handleOpenDialog = useCallback(async () => {
@@ -139,7 +145,7 @@ export default function App(): JSX.Element {
   const tabPaths = tabs.map((t) => t.path).join("\0");
   useEffect(() => {
     if (configLoaded.current) {
-      mdview.saveOpenFiles(tabs.map((t) => t.path));
+      mdview.saveOpenFiles(tabs.filter((t) => !t.removed).map((t) => t.path));
     }
   }, [tabPaths]); // eslint-disable-line react-hooks/exhaustive-deps
 
