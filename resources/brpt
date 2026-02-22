@@ -1,75 +1,132 @@
-#!/bin/bash
+#!/usr/bin/env python3
 
-SOURCE="$0"
-while [ -L "$SOURCE" ]; do
-  DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
-  SOURCE="$(readlink "$SOURCE")"
-  [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
-done
-SCRIPT_DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
-APP_PATH="$(dirname "$(dirname "$SCRIPT_DIR")")"
+import argparse
+import json
+import os
+import subprocess
+import sys
 
-# Resolve config path
-DEFAULT_CONFIG_PATH="$HOME/.brpt/brpt-config.json"
-CONFIG_PATH="${BRPT_CONFIG:-$DEFAULT_CONFIG_PATH}"
+def resolve_path(path):
+    return os.path.realpath(path)
 
-# Parse brpt_development_roots from config
-DEV_ROOTS=()
-if [ -f "$CONFIG_PATH" ]; then
-  while IFS= read -r root; do
-    [ -n "$root" ] && DEV_ROOTS+=("$root")
-  done < <(python3 -c "
-import json, sys
-try:
-    cfg = json.load(open(sys.argv[1]))
-    for r in cfg.get('brpt_development_roots', []):
-        print(r)
-except Exception:
-    pass
-" "$CONFIG_PATH" 2>/dev/null)
-fi
+def find_app_path():
+    source = os.path.realpath(__file__)
+    script_dir = os.path.dirname(source)
+    return os.path.dirname(os.path.dirname(script_dir))
 
-# Resolve file paths to absolute, rejecting any that don't exist
-FILES=()
-HAD_ERROR=0
-for arg in "$@"; do
-  if [ -f "$arg" ]; then
-    FILES+=("$(cd "$(dirname "$arg")" && pwd)/$(basename "$arg")")
-  else
-    echo "brpt: $arg: No such file" >&2
-    HAD_ERROR=1
-  fi
-done
+def load_dev_roots(config_path):
+    try:
+        with open(config_path) as f:
+            cfg = json.load(f)
+        return cfg.get("brpt_development_roots", [])
+    except Exception:
+        return []
 
-# If files were requested but none were valid, exit early
-if [ $# -gt 0 ] && [ ${#FILES[@]} -eq 0 ]; then
-  exit 1
-fi
+def find_app_binary(app_path):
+    """Find the executable binary inside a .app bundle."""
+    macos_dir = os.path.join(app_path, "Contents", "MacOS")
+    entries = os.listdir(macos_dir)
+    if len(entries) == 1:
+        return os.path.join(macos_dir, entries[0])
+    # Prefer the one matching the .app name
+    app_name = os.path.basename(app_path).replace(".app", "")
+    for entry in entries:
+        if entry == app_name:
+            return os.path.join(macos_dir, entry)
+    return os.path.join(macos_dir, entries[0])
 
-# Check for a running dev instance
-for DEV_ROOT in "${DEV_ROOTS[@]}"; do
-  ELECTRON_APP="$DEV_ROOT/node_modules/electron/dist/Electron.app"
-  if pgrep -qf "$ELECTRON_APP/Contents/MacOS/Electron"; then
-    if [ ${#FILES[@]} -gt 0 ]; then
-      open -a "$ELECTRON_APP" "${FILES[@]}"
-    else
-      open -a "$ELECTRON_APP"
-    fi
-    if [ "$HAD_ERROR" -eq 1 ]; then
-      exit 1
-    fi
-    exit 0
-  fi
-done
+def find_running_dev_instance(dev_roots):
+    for root in dev_roots:
+        electron_app = os.path.join(root, "node_modules/electron/dist/Electron.app")
+        electron_bin = os.path.join(electron_app, "Contents/MacOS/Electron")
+        try:
+            result = subprocess.run(
+                ["pgrep", "-qf", electron_bin],
+                capture_output=True,
+            )
+            if result.returncode == 0:
+                return electron_app
+        except Exception:
+            continue
+    return None
 
-# No dev instance — fall back to packaged app
-if [ $# -eq 0 ]; then
-  open -a "$APP_PATH"
-  exit 0
-fi
+def main():
+    parser = argparse.ArgumentParser(
+        description="Brett's Rad Preview Tool",
+        usage="brpt [file ...] | brpt --diff <new-file> <diff-file> | brpt --diff-by-files <new-file> <old-file>",
+    )
 
-open -a "$APP_PATH" "${FILES[@]}"
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--diff",
+        nargs=2,
+        metavar=("NEW_FILE", "DIFF_FILE"),
+        help="Open a diff view from a file and a unified diff file",
+    )
+    mode.add_argument(
+        "--diff-by-files",
+        nargs=2,
+        metavar=("NEW_FILE", "OLD_FILE"),
+        help="Open a diff view computed from two files",
+    )
+    parser.add_argument(
+        "files",
+        nargs="*",
+        help="Markdown files to open",
+    )
 
-if [ "$HAD_ERROR" -eq 1 ]; then
-  exit 1
-fi
+    args = parser.parse_args()
+
+    config_path = os.environ.get("BRPT_CONFIG") or os.path.join(
+        os.path.expanduser("~"), ".brpt", "brpt-config.json"
+    )
+    app_path = find_app_path()
+    dev_roots = load_dev_roots(config_path)
+    dev_app = find_running_dev_instance(dev_roots)
+    target_app = dev_app or app_path
+
+    had_error = False
+
+    if args.diff or args.diff_by_files:
+        if args.diff:
+            new_file, second_file = args.diff
+            flag = "--diff"
+        else:
+            new_file, second_file = args.diff_by_files
+            flag = "--diff-by-files"
+
+        for path in [new_file, second_file]:
+            if not os.path.isfile(path):
+                print(f"brpt: {path}: No such file", file=sys.stderr)
+                sys.exit(1)
+
+        new_file = resolve_path(new_file)
+        second_file = resolve_path(second_file)
+
+        # Launch the binary directly so Electron's single-instance lock
+        # forwards args to a running instance via the second-instance event.
+        app_bin = find_app_binary(target_app)
+        subprocess.run([app_bin, flag, new_file, second_file])
+        sys.exit(0)
+
+    resolved_files = []
+    for path in args.files:
+        if os.path.isfile(path):
+            resolved_files.append(resolve_path(path))
+        else:
+            print(f"brpt: {path}: No such file", file=sys.stderr)
+            had_error = True
+
+    if args.files and not resolved_files:
+        sys.exit(1)
+
+    if resolved_files:
+        subprocess.run(["open", "-a", target_app] + resolved_files)
+    else:
+        subprocess.run(["open", "-a", target_app])
+
+    if had_error:
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()

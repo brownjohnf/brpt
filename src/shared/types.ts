@@ -13,9 +13,17 @@ export interface WindowBounds {
   height: number;
 }
 
+export type DiffMode = "diff" | "diff-by-files";
+
+export type SavedDiff =
+  | { type: "diff"; file: string; diffFile: string }
+  | { type: "diff-by-files"; file: string; oldFile: string };
+
+export type OpenEntry = string | SavedDiff;
+
 export interface AppConfig {
   theme: "light" | "dark";
-  openFiles: string[];
+  openFiles: OpenEntry[];
   containerFolders: string[];
   contentWidth: ContentWidthConfig;
   brpt_development_roots?: string[];
@@ -27,4 +35,13 @@ export interface FileData {
   path: string;
   content: string;
   mtimeMs: number;
+}
+
+export interface DiffData {
+  mode: DiffMode;
+  newPath: string;
+  newContent: string;
+  secondPath: string;
+  oldContent?: string;
+  diff: string;
 }

@@ -1,10 +1,11 @@
 import { is } from "@electron-toolkit/utils";
 import { FSWatcher, watch } from "chokidar";
+import { createTwoFilesPatch } from "diff";
 import { app, BrowserWindow, dialog, ipcMain, screen, shell } from "electron";
 import fs from "fs";
 import os from "os";
-import { dirname, join, resolve } from "path";
-import type { AppConfig, FileData } from "../shared/types";
+import { basename, dirname, join, resolve } from "path";
+import type { AppConfig, DiffData, FileData, OpenEntry, SavedDiff } from "../shared/types";
 
 const DEFAULT_CONFIG: AppConfig = {
   theme: "light",
@@ -23,7 +24,16 @@ const CONFIG_PATH = process.env.BRPT_CONFIG || DEFAULT_CONFIG_PATH;
 let mainWindow: BrowserWindow | null = null;
 let windowReady = false;
 const pendingFiles: string[] = [];
+let pendingDiff: DiffData | null = null;
 const watchers = new Map<string, FSWatcher>();
+
+/** Tracks diff mode info for file-watching purposes */
+interface DiffWatch {
+  mode: "diff" | "diff-by-files";
+  newPath: string;
+  secondPath: string;
+}
+const diffWatches = new Map<string, DiffWatch>();
 
 function loadConfig(): AppConfig {
   try {
@@ -64,6 +74,12 @@ function watchFile(filePath: string): void {
 
   const watcher = watch(abs, { persistent: true });
   watcher.on("change", () => {
+    const diffWatch = diffWatches.get(abs);
+    if (diffWatch) {
+      handleDiffFileChange(diffWatch);
+      return;
+    }
+
     const file = readFile(abs);
     if (file && mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send("file-updated", { path: abs, ...file });
@@ -85,22 +101,125 @@ function unwatchFile(filePath: string): void {
     watcher.close();
     watchers.delete(abs);
   }
+  diffWatches.delete(abs);
 }
 
-function getCliFiles(argv: string[]): string[] {
-  // In packaged app, argv[0] is the app. In dev, argv[0] is electron, argv[1] is '.'.
-  // Files come after '--' when using `npm start -- file.md`
-  const dashDashIndex = argv.indexOf("--");
-  let args: string[];
-  if (dashDashIndex !== -1) {
-    args = argv.slice(dashDashIndex + 1);
-  } else {
-    // Skip electron binary and the '.' entry point
-    args = argv.slice(2);
+function handleDiffFileChange(dw: DiffWatch): void {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
   }
-  return args
-    .filter((a) => !a.startsWith("-") && a.endsWith(".md"))
+
+  const newFile = readFile(dw.newPath);
+  if (!newFile) {
+    return;
+  }
+
+  if (dw.mode === "diff-by-files") {
+    const oldFile = readFile(dw.secondPath);
+    if (!oldFile) {
+      return;
+    }
+    const diff = createTwoFilesPatch(
+      basename(dw.secondPath),
+      basename(dw.newPath),
+      oldFile.content,
+      newFile.content,
+    );
+    const data: DiffData = {
+      mode: "diff-by-files",
+      newPath: dw.newPath,
+      newContent: newFile.content,
+      secondPath: dw.secondPath,
+      oldContent: oldFile.content,
+      diff,
+    };
+    mainWindow.webContents.send("diff-updated", data);
+  } else {
+    const diffFile = readFile(dw.secondPath);
+    if (!diffFile) {
+      return;
+    }
+    const data: DiffData = {
+      mode: "diff",
+      newPath: dw.newPath,
+      newContent: newFile.content,
+      secondPath: dw.secondPath,
+      diff: diffFile.content,
+    };
+    mainWindow.webContents.send("diff-updated", data);
+  }
+}
+
+interface ParsedCliArgs {
+  markdownFiles: string[];
+  diff?: DiffData;
+}
+
+function parseCliArgs(argv: string[]): ParsedCliArgs {
+  // electron-vite and Electron may reorder args, so search the full argv
+  // for our flags and collect trailing non-flag file paths separately.
+  const hasDiff = argv.includes("--diff");
+  const hasDiffByFiles = argv.includes("--diff-by-files");
+
+  // Collect non-flag, non-electron args (file paths are always last)
+  const filePaths = argv.filter(
+    (a) => !a.startsWith("-") && a !== "." && !a.includes("Electron") && !a.includes("electron"),
+  );
+
+  if (hasDiff && filePaths.length >= 2) {
+    const newPath = resolveFilePath(filePaths[filePaths.length - 2]);
+    const diffPath = resolveFilePath(filePaths[filePaths.length - 1]);
+
+    const newFile = readFile(newPath);
+    const diffFile = readFile(diffPath);
+    if (newFile && diffFile) {
+      return {
+        markdownFiles: [],
+        diff: {
+          mode: "diff",
+          newPath,
+          newContent: newFile.content,
+          secondPath: diffPath,
+          diff: diffFile.content,
+        },
+      };
+    }
+    return { markdownFiles: [] };
+  }
+
+  if (hasDiffByFiles && filePaths.length >= 2) {
+    const newPath = resolveFilePath(filePaths[filePaths.length - 2]);
+    const oldPath = resolveFilePath(filePaths[filePaths.length - 1]);
+
+    const newFile = readFile(newPath);
+    const oldFile = readFile(oldPath);
+    if (newFile && oldFile) {
+      const diff = createTwoFilesPatch(
+        basename(oldPath),
+        basename(newPath),
+        oldFile.content,
+        newFile.content,
+      );
+      return {
+        markdownFiles: [],
+        diff: {
+          mode: "diff-by-files",
+          newPath,
+          newContent: newFile.content,
+          secondPath: oldPath,
+          oldContent: oldFile.content,
+          diff,
+        },
+      };
+    }
+    return { markdownFiles: [] };
+  }
+
+  const markdownFiles = filePaths
+    .filter((a) => a.endsWith(".md"))
     .map((a) => resolveFilePath(a));
+
+  return { markdownFiles };
 }
 
 function openFilesAndSend(filePaths: string[]): void {
@@ -123,6 +242,92 @@ function openFilesAndSend(filePaths: string[]): void {
 
   if (fileData.length > 0) {
     mainWindow.webContents.send("files-from-args", fileData);
+  }
+}
+
+function openDiffAndSend(data: DiffData, mode: "diff" | "diff-by-files", secondPath: string): void {
+  if (!windowReady || !mainWindow || mainWindow.isDestroyed()) {
+    pendingDiff = data;
+    return;
+  }
+
+  const dw: DiffWatch = { mode, newPath: data.newPath, secondPath };
+
+  watchFile(data.newPath);
+  diffWatches.set(resolveFilePath(data.newPath), dw);
+
+  watchFile(secondPath);
+  diffWatches.set(resolveFilePath(secondPath), dw);
+
+  mainWindow.webContents.send("diff-from-args", data);
+}
+
+function secondPathFor(saved: SavedDiff): string {
+  return saved.type === "diff" ? saved.diffFile : saved.oldFile;
+}
+
+function buildDiffData(saved: SavedDiff): DiffData | null {
+  const newPath = resolveFilePath(saved.file);
+  const secondPath = resolveFilePath(secondPathFor(saved));
+  const newFile = readFile(newPath);
+  if (!newFile) {
+    return null;
+  }
+
+  if (saved.type === "diff-by-files") {
+    const oldFile = readFile(secondPath);
+    if (!oldFile) {
+      return null;
+    }
+    return {
+      mode: "diff-by-files",
+      newPath,
+      newContent: newFile.content,
+      secondPath,
+      oldContent: oldFile.content,
+      diff: createTwoFilesPatch(
+        basename(secondPath),
+        basename(newPath),
+        oldFile.content,
+        newFile.content,
+      ),
+    };
+  } else {
+    const diffFile = readFile(secondPath);
+    if (!diffFile) {
+      return null;
+    }
+    return {
+      mode: "diff",
+      newPath,
+      newContent: newFile.content,
+      secondPath,
+      diff: diffFile.content,
+    };
+  }
+}
+
+function restoreSessionEntries(entries: OpenEntry[]): void {
+  const filePaths: string[] = [];
+  const diffs: SavedDiff[] = [];
+
+  for (const entry of entries) {
+    if (typeof entry === "string") {
+      filePaths.push(entry);
+    } else {
+      diffs.push(entry);
+    }
+  }
+
+  if (filePaths.length > 0) {
+    openFilesAndSend(filePaths);
+  }
+
+  for (const saved of diffs) {
+    const data = buildDiffData(saved);
+    if (data) {
+      openDiffAndSend(data, saved.type, resolveFilePath(secondPathFor(saved)));
+    }
   }
 }
 
@@ -200,20 +405,31 @@ function createWindow(): void {
     const config = loadConfig();
     mainWindow.webContents.send("config-loaded", config);
 
-    const cliFiles = getCliFiles(process.argv);
-    const sessionFiles = config.openFiles || [];
+    const parsed = parseCliArgs(process.argv);
 
-    // CLI files take priority; fall back to session restore
-    const filesToOpen = cliFiles.length > 0 ? cliFiles : sessionFiles;
+    const cliFiles = parsed.markdownFiles;
+    const sessionEntries = config.openFiles || [];
 
-    // Include any files that arrived via open-file before the window was ready
+    // Always restore the session
+    restoreSessionEntries(sessionEntries);
+
+    // CLI args open on top of the session
+    if (cliFiles.length > 0) {
+      openFilesAndSend(cliFiles);
+    }
+
     if (pendingFiles.length > 0) {
-      filesToOpen.push(...pendingFiles);
+      openFilesAndSend(pendingFiles);
       pendingFiles.length = 0;
     }
 
-    if (filesToOpen.length > 0) {
-      openFilesAndSend(filesToOpen);
+    if (parsed.diff) {
+      openDiffAndSend(parsed.diff, parsed.diff.mode, parsed.diff.secondPath);
+    }
+
+    if (pendingDiff) {
+      mainWindow.webContents.send("diff-from-args", pendingDiff);
+      pendingDiff = null;
     }
   });
 
@@ -251,9 +467,14 @@ if (!gotTheLock) {
   });
 
   app.on("second-instance", (_event, argv) => {
-    const files = getCliFiles(argv);
-    if (files.length > 0) {
-      openFilesAndSend(files);
+    const parsed = parseCliArgs(argv);
+
+    if (parsed.diff) {
+      openDiffAndSend(parsed.diff, parsed.diff.mode, parsed.diff.secondPath);
+    }
+
+    if (parsed.markdownFiles.length > 0) {
+      openFilesAndSend(parsed.markdownFiles);
     }
 
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -317,6 +538,38 @@ ipcMain.handle("request-file", (_event, filePath: string) => {
   return null;
 });
 
+ipcMain.handle("request-diff-by-files", (_event, newPath: string, oldPath: string) => {
+  const absNew = resolveFilePath(newPath);
+  const absOld = resolveFilePath(oldPath);
+  const newFile = readFile(absNew);
+  const oldFile = readFile(absOld);
+  if (!newFile || !oldFile) {
+    return null;
+  }
+  const diff = createTwoFilesPatch(
+    basename(absOld),
+    basename(absNew),
+    oldFile.content,
+    newFile.content,
+  );
+  const data: DiffData = {
+    mode: "diff-by-files",
+    newPath: absNew,
+    newContent: newFile.content,
+    secondPath: absOld,
+    oldContent: oldFile.content,
+    diff,
+  };
+
+  const dw: DiffWatch = { mode: "diff-by-files", newPath: absNew, secondPath: absOld };
+  watchFile(absNew);
+  diffWatches.set(absNew, dw);
+  watchFile(absOld);
+  diffWatches.set(absOld, dw);
+
+  return data;
+});
+
 ipcMain.on("close-file", (_event, filePath: string) => {
   unwatchFile(filePath);
 });
@@ -331,8 +584,8 @@ ipcMain.on("set-config", (_event, key: string, value: unknown) => {
   saveConfig(config);
 });
 
-ipcMain.on("save-open-files", (_event, files: string[]) => {
+ipcMain.on("save-open-files", (_event, entries: OpenEntry[]) => {
   const config = loadConfig();
-  config.openFiles = files;
+  config.openFiles = entries;
   saveConfig(config);
 });

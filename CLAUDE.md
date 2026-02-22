@@ -67,13 +67,18 @@ npm run build:mac  # Build + package .app
 
 Uses `electron-builder` (config in `electron-builder.yml`). The app is unsigned (no Apple Developer cert).
 
+## Core Invariants
+
+- Every open file gets a tab. Every tab gets persisted. No change should break tab persistence, regardless of file type or viewer kind.
+- **The config is persistent state, not a session.** `openFiles` is the user's workspace. It is always restored on launch — CLI args open _on top of_ the existing config, never replacing it. The config is never wiped unless the user explicitly does so.
+
 ## Key Design Decisions
 
 - **Single instance**: Uses `app.requestSingleInstanceLock()`. Second launches forward their CLI args to the first instance.
 - **File watching**: chokidar in the main process, sends updates via IPC.
 - **Markdown rendering in preload**: The renderer has `contextIsolation: true` and no Node access. Rendering (marked + highlight.js) lives in the preload script which exposes `mdview.renderMarkdown()` to the renderer.
 - **Theme**: Two themes (light/dark) via `data-theme` attribute on `<body>`. Theme stylesheets (github-markdown-css, highlight.js) are imported as raw CSS and toggled via `<style disabled>` elements in the `useThemeStyles` hook.
-- **Session restore**: Open files are persisted to `~/.brpt/brpt-config.json` and restored on next launch. Config path can be overridden with `BRPT_CONFIG` env var.
+- **Session restore**: Open tabs are persisted to `openFiles` in `~/.brpt/brpt-config.json` and restored on next launch. Entries are either plain strings (viewer auto-detected from file extension) or objects describing the viewer and its inputs (e.g., `{ type: "diff-by-files", file, oldFile }`). Config path can be overridden with `BRPT_CONFIG` env var.
 - **Temporal polyfill**: `@js-temporal/polyfill` is loaded as a true polyfill in `main.tsx` and assigned to `globalThis`. Global types are declared in `env.d.ts`. Use `Temporal` directly anywhere in the renderer — do not import the polyfill per-file. Do not use `Date`.
 - **Tab state**: `useReducer` in `App.tsx` manages tabs + activeIndex atomically via `tabsReducer.ts`. Actions: `OPEN_FILE`, `CLOSE_TAB`, `ACTIVATE_TAB`, `FILE_UPDATED`.
 - **Tab grouping**: `containerFolders` in config define project roots. Tabs whose paths fall under a root are grouped in the sidebar. Others appear under "Ungrouped".

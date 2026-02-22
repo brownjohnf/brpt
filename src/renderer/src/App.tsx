@@ -5,6 +5,11 @@ import { Sidebar } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
 import { TopBar } from "./components/TopBar";
 import {
+  DiffContent,
+  DiffTopBarContent,
+  useDiffViewMode,
+} from "./components/viewers/DiffViewer";
+import {
   MarkdownContent,
   MarkdownTopBarContent,
 } from "./components/viewers/MarkdownViewer";
@@ -13,7 +18,10 @@ import type {
   AppConfig,
   ContentWidthConfig,
   ContentWidthMode,
+  DiffData,
+  DiffTab,
   FileData,
+  OpenEntry,
 } from "./types";
 import { groupTabs } from "./groupTabs";
 import { useThemeStyles } from "./useThemeStyles";
@@ -41,8 +49,14 @@ export default function App(): JSX.Element {
   const activeTab =
     activeIndex >= 0 && activeIndex < tabs.length ? tabs[activeIndex] : null;
 
+  const [diffViewMode, setDiffViewMode] = useDiffViewMode();
+
   const openFile = useCallback((data: FileData) => {
     dispatch({ type: "OPEN_FILE", data });
+  }, []);
+
+  const openDiff = useCallback((data: DiffData) => {
+    dispatch({ type: "OPEN_DIFF", data });
   }, []);
 
   const closeTab = useCallback(
@@ -144,11 +158,22 @@ export default function App(): JSX.Element {
     [openFile],
   );
 
-  // Persist open files whenever the tab list changes
+  // Persist open tabs whenever the tab list changes
   const tabPaths = tabs.map((t) => t.path).join("\0");
   useEffect(() => {
     if (configLoaded.current) {
-      mdview.saveOpenFiles(tabs.filter((t) => !t.removed).map((t) => t.path));
+      const entries: OpenEntry[] = tabs
+        .filter((t) => !t.removed)
+        .map((t) => {
+          if (t.kind === "diff") {
+            const dt = t as DiffTab;
+            return dt.mode === "diff"
+              ? { type: "diff" as const, file: dt.path, diffFile: dt.secondPath }
+              : { type: "diff-by-files" as const, file: dt.path, oldFile: dt.secondPath };
+          }
+          return t.path;
+        });
+      mdview.saveOpenFiles(entries);
     }
   }, [tabPaths]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -171,6 +196,12 @@ export default function App(): JSX.Element {
       mdview.onFilesFromArgs((files: FileData[]) => {
         files.forEach((f) => openFile(f));
       }),
+      mdview.onDiffFromArgs((data: DiffData) => {
+        openDiff(data);
+      }),
+      mdview.onDiffUpdated((data: DiffData) => {
+        dispatch({ type: "DIFF_UPDATED", data });
+      }),
       mdview.onConfigLoaded((config: AppConfig) => {
         configLoaded.current = true;
         if (config.theme) {
@@ -188,7 +219,7 @@ export default function App(): JSX.Element {
       }),
     ];
     return () => unsubs.forEach((fn) => fn());
-  }, [openFile]);
+  }, [openFile, openDiff]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -347,6 +378,13 @@ export default function App(): JSX.Element {
                 onChangeWidthValue={changeContentWidthValue}
               />
             )}
+            {activeTab?.kind === "diff" && (
+              <DiffTopBarContent
+                tab={activeTab}
+                viewMode={diffViewMode}
+                onChangeViewMode={setDiffViewMode}
+              />
+            )}
           </TopBar>
           <ContentArea
             ref={mainRef}
@@ -358,6 +396,12 @@ export default function App(): JSX.Element {
                 tab={activeTab}
                 contentWidth={contentWidth}
                 onRetryRemoved={handleRetryRemoved}
+              />
+            )}
+            {activeTab?.kind === "diff" && (
+              <DiffContent
+                tab={activeTab}
+                viewMode={diffViewMode}
               />
             )}
           </ContentArea>

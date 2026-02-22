@@ -1,10 +1,14 @@
-import type { FileData } from "../../shared/types";
+import type { DiffMode } from "../../shared/types";
 
 export type {
   AppConfig,
   ContentWidthConfig,
   ContentWidthMode,
+  DiffData,
+  DiffMode,
   FileData,
+  OpenEntry,
+  SavedDiff,
 } from "../../shared/types";
 
 export interface BaseTab {
@@ -21,4 +25,13 @@ export interface MarkdownTab extends BaseTab {
   mtimeMs: number;
 }
 
-export type Tab = MarkdownTab;
+export interface DiffTab extends BaseTab {
+  kind: "diff";
+  mode: DiffMode;
+  secondPath: string;
+  newContent: string;
+  oldContent?: string;
+  diff: string;
+}
+
+export type Tab = MarkdownTab | DiffTab;

@@ -3,21 +3,23 @@ import hljs from "highlight.js";
 import { Marked } from "marked";
 import { markedHighlight } from "marked-highlight";
 import os from "os";
-import type { AppConfig, FileData } from "../shared/types";
-export type { AppConfig, FileData };
+import type { AppConfig, DiffData, FileData, OpenEntry } from "../shared/types";
+export type { AppConfig, DiffData, FileData, OpenEntry };
 
 export interface MdviewApi {
   renderMarkdown(text: string): string;
   onFileUpdated(callback: (data: FileData) => void): () => void;
   onFileRemoved(callback: (data: { path: string }) => void): () => void;
   onFilesFromArgs(callback: (files: FileData[]) => void): () => void;
+  onDiffFromArgs(callback: (data: DiffData) => void): () => void;
+  onDiffUpdated(callback: (data: DiffData) => void): () => void;
   onConfigLoaded(callback: (config: AppConfig) => void): () => void;
   openFileDialog(): Promise<FileData[]>;
   requestFile(filePath: string): Promise<FileData | null>;
   closeFile(filePath: string): void;
   getConfig(): Promise<AppConfig>;
   setConfig(key: string, value: unknown): void;
-  saveOpenFiles(files: string[]): void;
+  saveOpenFiles(entries: OpenEntry[]): void;
   homedir: string;
 }
 
@@ -63,6 +65,22 @@ const api: MdviewApi = {
       ipcRenderer.removeListener("files-from-args", listener);
     };
   },
+  onDiffFromArgs: (callback: (data: DiffData) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, data: DiffData): void =>
+      callback(data);
+    ipcRenderer.on("diff-from-args", listener);
+    return () => {
+      ipcRenderer.removeListener("diff-from-args", listener);
+    };
+  },
+  onDiffUpdated: (callback: (data: DiffData) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, data: DiffData): void =>
+      callback(data);
+    ipcRenderer.on("diff-updated", listener);
+    return () => {
+      ipcRenderer.removeListener("diff-updated", listener);
+    };
+  },
   onConfigLoaded: (callback: (config: AppConfig) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, config: AppConfig): void =>
       callback(config);
@@ -78,8 +96,8 @@ const api: MdviewApi = {
   getConfig: () => ipcRenderer.invoke("get-config"),
   setConfig: (key: string, value: unknown) =>
     ipcRenderer.send("set-config", key, value),
-  saveOpenFiles: (files: string[]) =>
-    ipcRenderer.send("save-open-files", files),
+  saveOpenFiles: (entries: OpenEntry[]) =>
+    ipcRenderer.send("save-open-files", entries),
   homedir: os.homedir(),
 };
 

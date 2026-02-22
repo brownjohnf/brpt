@@ -1,4 +1,4 @@
-import type { FileData, Tab } from "./types";
+import type { DiffData, DiffTab, FileData, MarkdownTab, Tab } from "./types";
 
 export interface TabsState {
   tabs: Tab[];
@@ -11,7 +11,9 @@ export type TabsAction =
   | { type: "ACTIVATE_TAB"; index: number; currentScrollTop: number }
   | { type: "FILE_UPDATED"; data: FileData }
   | { type: "FILE_REMOVED"; path: string }
-  | { type: "REORDER_TAB"; fromIndex: number; toIndex: number };
+  | { type: "REORDER_TAB"; fromIndex: number; toIndex: number }
+  | { type: "OPEN_DIFF"; data: DiffData }
+  | { type: "DIFF_UPDATED"; data: DiffData };
 
 export const initialTabsState: TabsState = {
   tabs: [],
@@ -25,7 +27,8 @@ export function tabsReducer(state: TabsState, action: TabsAction): TabsState {
       const existing = state.tabs.findIndex((t) => t.path === data.path);
       if (existing !== -1) {
         const tabs = [...state.tabs];
-        tabs[existing] = { ...tabs[existing], content: data.content, removed: false };
+        const tab = tabs[existing] as MarkdownTab;
+        tabs[existing] = { ...tab, content: data.content, removed: false };
         return { tabs, activeIndex: existing };
       }
       const newTab: Tab = {
@@ -41,6 +44,56 @@ export function tabsReducer(state: TabsState, action: TabsAction): TabsState {
       };
       const tabs = [...state.tabs, newTab];
       return { tabs, activeIndex: tabs.length - 1 };
+    }
+
+    case "OPEN_DIFF": {
+      const { data } = action;
+      const existing = state.tabs.findIndex((t) => t.path === data.newPath);
+      if (existing !== -1) {
+        const tabs = [...state.tabs];
+        const tab = tabs[existing] as DiffTab;
+        tabs[existing] = {
+          ...tab,
+          diff: data.diff,
+          newContent: data.newContent,
+          oldContent: data.oldContent,
+          removed: false,
+        };
+        return { tabs, activeIndex: existing };
+      }
+      const newTab: DiffTab = {
+        kind: "diff",
+        mode: data.mode,
+        secondPath: data.secondPath,
+        path: data.newPath,
+        newContent: data.newContent,
+        oldContent: data.oldContent,
+        diff: data.diff,
+        scrollTop: 0,
+        lastModifiedAt: Temporal.Now.instant(),
+        hasUnseenChanges: false,
+      };
+      const tabs = [...state.tabs, newTab];
+      return { tabs, activeIndex: tabs.length - 1 };
+    }
+
+    case "DIFF_UPDATED": {
+      const { data } = action;
+      const index = state.tabs.findIndex((t) => t.path === data.newPath);
+      if (index === -1) {
+        return state;
+      }
+      const tabs = [...state.tabs];
+      const tab = tabs[index] as DiffTab;
+      tabs[index] = {
+        ...tab,
+        diff: data.diff,
+        newContent: data.newContent,
+        oldContent: data.oldContent,
+        lastModifiedAt: Temporal.Now.instant(),
+        hasUnseenChanges: index !== state.activeIndex,
+      };
+      return { tabs, activeIndex: state.activeIndex };
     }
 
     case "CLOSE_TAB": {
@@ -87,8 +140,9 @@ export function tabsReducer(state: TabsState, action: TabsAction): TabsState {
         return state;
       }
       const tabs = [...state.tabs];
+      const tab = tabs[index] as MarkdownTab;
       tabs[index] = {
-        ...tabs[index],
+        ...tab,
         content: data.content,
         mtimeMs: data.mtimeMs,
         lastModifiedAt: Temporal.Instant.fromEpochMilliseconds(
