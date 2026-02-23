@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { toast, Toaster } from "sonner";
 import { ContentArea } from "./components/ContentArea";
 import { QuickGoto } from "./components/QuickGoto";
 import { Sidebar } from "./components/Sidebar";
@@ -114,6 +115,8 @@ export default function App(): JSX.Element {
       const result = await mdview.requestFile(path);
       if (result) {
         openFile(result);
+      } else {
+        toast.error("File not found");
       }
     },
     [openFile],
@@ -411,6 +414,7 @@ export default function App(): JSX.Element {
         path={activeTab?.path ?? null}
         lastModifiedAt={activeTab?.lastModifiedAt ?? null}
       />
+      <Toaster theme={theme} position="bottom-center" style={{ bottom: "28px" }} />
       {quickGotoOpen && (
         <QuickGoto
           tabs={tabs}
