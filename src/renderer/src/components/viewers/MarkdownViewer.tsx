@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { classNames } from "../../classNames";
 import type { Annotation, ContentWidthConfig, ContentWidthMode, MarkdownTab } from "../../types";
+import { AnnotationGutter, type GutterLine } from "../AnnotationGutter";
 import { useCurrentHeading } from "../../useCurrentHeading";
 import { SegmentedControl } from "../ui-elements/SegmentedControl";
 
@@ -50,7 +51,7 @@ export function MarkdownTopBarContent({
   contentWidth,
   onChangeMode,
   onChangeWidthValue,
-}: MarkdownTopBarContentProps): JSX.Element {
+}: MarkdownTopBarContentProps): ReactNode {
   const currentHeading = useCurrentHeading(scrollRef, content);
   const widthValue =
     contentWidth.mode === "fixed"
@@ -126,6 +127,29 @@ export function MarkdownTopBarContent({
   );
 }
 
+function measureMarkdownLines(contentEl: HTMLElement, gutterEl: HTMLElement): GutterLine[] {
+  const gutterRect = gutterEl.getBoundingClientRect();
+  const allElements = contentEl.querySelectorAll<HTMLElement>("[data-source-line]");
+  const elements = Array.from(allElements).filter(e => !e.closest(".annotation-block"));
+  const raw: { line: number; top: number; bottom: number }[] = [];
+
+  for (const element of elements) {
+    const line = parseInt(element.dataset.sourceLine!, 10);
+    const rect = element.getBoundingClientRect();
+    raw.push({
+      line,
+      top: rect.top - gutterRect.top,
+      bottom: rect.bottom - gutterRect.top,
+    });
+  }
+
+  return raw.map((entry, i) => {
+    const nextLine = i < raw.length - 1 ? raw[i + 1].line : null;
+    const endLine = nextLine != null ? nextLine - 1 : entry.line;
+    return { ...entry, endLine: Math.max(endLine, entry.line) };
+  });
+}
+
 interface MarkdownContentProps {
   tab: MarkdownTab;
   contentWidth: ContentWidthConfig;
@@ -139,17 +163,11 @@ function annotationInsertionLine(a: Annotation): number {
   return a.line ?? 0;
 }
 
-function renderAnnotationContent(a: Annotation): string {
-  if (a.format === "markdown") {
-    return mdview.renderMarkdown(a.content);
-  }
-  // Future: "html" would pass through, "text" would escape and wrap in <pre>
-  return mdview.renderMarkdown(a.content);
-}
-
 interface AnnotatedChunk {
   html: string;
   annotations: Annotation[];
+  startLine: number;
+  endLine: number;
 }
 
 function buildAnnotatedChunks(content: string, annotations: Annotation[]): AnnotatedChunk[] {
@@ -181,14 +199,20 @@ function buildAnnotatedChunks(content: string, annotations: Annotation[]): Annot
     const lineIdx = Math.min(bp, lines.length);
     if (lineIdx > cursor) {
       const chunk = lines.slice(cursor, lineIdx).join("\n");
-      chunks.push({ html: mdview.renderMarkdown(chunk), annotations: byLine.get(bp)! });
+      const chunkStartLine = cursor + 1;
+      chunks.push({
+        html: mdview.renderMarkdown(chunk, chunkStartLine),
+        annotations: byLine.get(bp)!,
+        startLine: chunkStartLine,
+        endLine: lineIdx,
+      });
       cursor = lineIdx;
     } else {
       // Annotation at or before cursor — attach to previous chunk or create empty one
       if (chunks.length > 0) {
         chunks[chunks.length - 1].annotations.push(...byLine.get(bp)!);
       } else {
-        chunks.push({ html: "", annotations: byLine.get(bp)! });
+        chunks.push({ html: "", annotations: byLine.get(bp)!, startLine: 1, endLine: 0 });
       }
     }
   }
@@ -196,7 +220,13 @@ function buildAnnotatedChunks(content: string, annotations: Annotation[]): Annot
   // Remaining content after the last annotation
   if (cursor < lines.length) {
     const chunk = lines.slice(cursor).join("\n");
-    chunks.push({ html: mdview.renderMarkdown(chunk), annotations: [] });
+    const chunkStartLine = cursor + 1;
+    chunks.push({
+      html: mdview.renderMarkdown(chunk, chunkStartLine),
+      annotations: [],
+      startLine: chunkStartLine,
+      endLine: lines.length,
+    });
   }
 
   return chunks;
@@ -206,14 +236,15 @@ export function MarkdownContent({
   tab,
   contentWidth,
   onRetryRemoved,
-}: MarkdownContentProps): JSX.Element {
+}: MarkdownContentProps): ReactNode {
   const hasAnnotations = tab.annotations && tab.annotations.length > 0;
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const renderedHtml = useMemo(() => {
     if (hasAnnotations) {
       return null;
     }
-    return mdview.renderMarkdown(tab.content);
+    return mdview.renderMarkdown(tab.content, 1);
   }, [tab.content, hasAnnotations]);
 
   const annotatedChunks = useMemo(() => {
@@ -261,34 +292,37 @@ export function MarkdownContent({
           </button>
         </div>
       )}
-      {annotatedChunks ? (
-        <div className="mx-auto" style={contentStyle}>
-          {annotatedChunks.map((chunk, i) => (
-            <div key={i}>
-              {chunk.html && (
-                <div
-                  className="markdown-body"
-                  dangerouslySetInnerHTML={{ __html: chunk.html }}
-                />
-              )}
-              {chunk.annotations.map((a, j) => (
-                <div key={j} className="annotation-block">
+      <div className="flex min-h-full">
+        <AnnotationGutter
+          contentRef={contentRef}
+          measureLines={measureMarkdownLines}
+          deps={[tab.content, tab.annotations]}
+          annotations={tab.annotations}
+        />
+        <div ref={contentRef} className="flex-1 min-w-0 pl-8">
+          <div className="mx-auto" style={contentStyle}>
+          {annotatedChunks ? (
+            annotatedChunks.map((chunk, i) => (
+              <div key={i}>
+                {chunk.html && (
                   <div
                     className="markdown-body"
-                    dangerouslySetInnerHTML={{ __html: renderAnnotationContent(a) }}
+                    data-chunk-lines={`${chunk.startLine}-${chunk.endLine}`}
+                    dangerouslySetInnerHTML={{ __html: chunk.html }}
                   />
-                </div>
-              ))}
-            </div>
-          ))}
+                )}
+                {/* Annotations collapsed for now */}
+              </div>
+            ))
+          ) : (
+            <div
+              className="markdown-body"
+              dangerouslySetInnerHTML={{ __html: renderedHtml! }}
+            />
+          )}
+          </div>
         </div>
-      ) : (
-        <div
-          className="markdown-body mx-auto"
-          style={contentStyle}
-          dangerouslySetInnerHTML={{ __html: renderedHtml! }}
-        />
-      )}
+      </div>
     </>
   );
 }

@@ -68,16 +68,74 @@ body[data-theme="dark"] {
   background: transparent !important;
 }
 
+.annotation-wrapper {
+  margin: 8px 0;
+}
+
 .annotation-block {
   border-left: 3px solid var(--tab-changed-dot);
   background: var(--tab-hover-bg);
   padding: 8px 12px;
-  margin: 8px 0;
   border-radius: 4px;
 }
 
 .annotation-block .markdown-body {
   font-size: 0.9em;
+}
+
+.annotation-gutter {
+  position: relative;
+  width: 28px;
+  flex-shrink: 0;
+  background: var(--tab-hover-bg);
+  min-height: 100%;
+  margin-top: -32px;
+  margin-bottom: -32px;
+  padding-top: 32px;
+  padding-bottom: 32px;
+}
+
+.gutter-line-entry {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.gutter-line-number {
+  font-size: 11px;
+  line-height: 1;
+  text-align: right;
+  padding-right: 4px;
+  padding-bottom: 2px;
+  color: var(--status-text);
+  opacity: 0.6;
+  user-select: none;
+}
+
+.gutter-line-divider {
+  border-bottom: 1px solid var(--sidebar-border);
+  margin-top: -1px;
+}
+
+.gutter-annotation-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tab-changed-dot);
+  flex-shrink: 0;
+  position: absolute;
+  left: 4px;
+  bottom: 5px;
+}
+
+.gutter-annotation-range-line {
+  position: absolute;
+  left: 7px;
+  width: 2px;
+  background: var(--tab-changed-dot);
 }
 
 /* diff2html overrides */

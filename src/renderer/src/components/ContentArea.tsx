@@ -19,7 +19,7 @@ export const ContentArea = forwardRef<HTMLDivElement, ContentAreaProps>(
     return (
       <div
         ref={ref}
-        className="flex-1 overflow-auto p-8 relative"
+        className="flex-1 overflow-auto pt-8 pr-8 pb-8 relative"
         style={{ background: "var(--bg)" }}
         onDragOver={handleDragOver}
         onDrop={onDrop}

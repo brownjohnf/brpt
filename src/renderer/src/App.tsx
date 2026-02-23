@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState, type ReactNode } from "react";
 import { toast, Toaster } from "sonner";
 import { ContentArea } from "./components/ContentArea";
 import { QuickGoto } from "./components/QuickGoto";
@@ -32,7 +32,7 @@ import { useThemeStyles } from "./useThemeStyles";
 
 const { mdview } = window;
 
-export default function App(): JSX.Element {
+export default function App(): ReactNode {
   const [{ tabs, activeIndex }, dispatch] = useReducer(
     tabsReducer,
     initialTabsState,
@@ -76,8 +76,8 @@ export default function App(): JSX.Element {
         } else {
           inner = tab.path;
         }
-        const entry: OpenEntry = tab.annotationPath
-          ? { entry: inner, annotationFile: tab.annotationPath }
+        const entry: OpenEntry = (tab.annotationPath || typeof inner !== "string")
+          ? { entry: inner, ...(tab.annotationPath && { annotationFile: tab.annotationPath }) }
           : inner;
         recentlyClosed.current.push(entry);
         if (recentlyClosed.current.length > 20) {
@@ -194,8 +194,11 @@ export default function App(): JSX.Element {
             inner = t.path;
           }
 
-          if (t.annotationPath) {
-            const envelope: OpenFileEntry = { entry: inner, annotationFile: t.annotationPath };
+          if (t.annotationPath || typeof inner !== "string") {
+            const envelope: OpenFileEntry = { entry: inner };
+            if (t.annotationPath) {
+              envelope.annotationFile = t.annotationPath;
+            }
             return envelope;
           }
           return inner;

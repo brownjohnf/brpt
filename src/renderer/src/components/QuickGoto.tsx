@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { classNames } from "../classNames";
 import type { Tab } from "../types";
 
@@ -22,7 +22,7 @@ export function QuickGoto({
   tabs,
   onActivateTab,
   onClose,
-}: QuickGotoProps): JSX.Element {
+}: QuickGotoProps): ReactNode {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);

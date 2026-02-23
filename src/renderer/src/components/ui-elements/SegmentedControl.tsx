@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { classNames } from "../../classNames";
 
 interface SegmentedControlOption<T extends string> {
@@ -15,7 +16,7 @@ export function SegmentedControl<T extends string>({
   options,
   value,
   onChange,
-}: SegmentedControlProps<T>): JSX.Element {
+}: SegmentedControlProps<T>): ReactNode {
   return (
     <div className="flex rounded-md overflow-hidden border border-[var(--sidebar-border)]">
       {options.map((opt) => (

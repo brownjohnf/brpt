@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 import { classNames } from "../classNames";
 import { groupTabs } from "../groupTabs";
 import type { Tab } from "../types";
@@ -33,7 +33,7 @@ export function Sidebar({
   onDrop,
   onResize,
   onReorderTab,
-}: SidebarProps): JSX.Element {
+}: SidebarProps): ReactNode {
   const [dragOver, setDragOver] = useState(false);
   const dragging = useRef(false);
 

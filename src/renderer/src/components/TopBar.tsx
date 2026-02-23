@@ -4,7 +4,7 @@ interface TopBarProps {
   children?: ReactNode;
 }
 
-export function TopBar({ children }: TopBarProps): JSX.Element {
+export function TopBar({ children }: TopBarProps): ReactNode {
   return (
     <div
       className="flex items-center justify-between gap-2 px-4 py-1 shrink-0 border-b border-[var(--sidebar-border)]"

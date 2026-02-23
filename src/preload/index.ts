@@ -1,13 +1,13 @@
 import { contextBridge, ipcRenderer } from "electron";
 import hljs from "highlight.js";
-import { Marked } from "marked";
+import { Marked, type Token, type Tokens } from "marked";
 import { markedHighlight } from "marked-highlight";
 import os from "os";
 import type { AnnotationData, AppConfig, DiffData, FileData, OpenEntry } from "../shared/types";
 export type { AnnotationData, AppConfig, DiffData, FileData, OpenEntry };
 
 export interface MdviewApi {
-  renderMarkdown(text: string): string;
+  renderMarkdown(text: string, startLine?: number): string;
   onFileUpdated(callback: (data: FileData) => void): () => void;
   onFileRemoved(callback: (data: { path: string }) => void): () => void;
   onFilesFromArgs(callback: (files: FileData[]) => void): () => void;
@@ -28,6 +28,146 @@ export interface MdviewApi {
   homedir: string;
 }
 
+/** Assign `_line` to tokens based on cumulative newlines in `raw`. */
+function assignLineNumbers(tokens: Token[], startLine: number = 1): void {
+  let line = startLine;
+  for (const token of tokens) {
+    (token as Record<string, unknown>)._line = line;
+
+    if (token.type === "list") {
+      const listToken = token as Tokens.List;
+      let itemLine = line;
+      for (const item of listToken.items) {
+        (item as unknown as Record<string, unknown>)._line = itemLine;
+        itemLine += item.raw.split("\n").length - 1;
+      }
+    }
+
+    if (token.type === "blockquote") {
+      const bqToken = token as Tokens.Blockquote;
+      assignLineNumbers(bqToken.tokens);
+    }
+
+    if (token.type === "table") {
+      const tableToken = token as Tokens.Table & { _headerLine?: number; _rowLines?: number[] };
+      // Header row is the first line of the table, separator is the second
+      tableToken._headerLine = line;
+      tableToken._rowLines = [];
+      // +2 for header row + separator row
+      let rowLine = line + 2;
+      for (let i = 0; i < tableToken.rows.length; i++) {
+        tableToken._rowLines.push(rowLine);
+        rowLine++;
+      }
+    }
+
+    const newlines = token.raw.split("\n").length - 1;
+    line += newlines;
+  }
+}
+
+function injectLineAttr(tag: string, line: number | undefined): string {
+  if (line == null) {
+    return tag;
+  }
+  return tag.replace(/>/, ` data-source-line="${line}">`);
+}
+
+const lineRenderer = {
+  code(this: { parser: { parseInline(tokens: Token[]): string } }, token: Tokens.Code & { _line?: number }) {
+    const langString = (token.lang || "").match(/\S+/)?.[0] ? token.lang : "";
+    const raw = token.text.replace(/\n$/, "") + "\n";
+
+    // markedHighlight's renderer is overridden by ours, so highlight here directly.
+    let highlighted: string;
+    if (langString && hljs.getLanguage(langString)) {
+      highlighted = hljs.highlight(raw, { language: langString }).value;
+    } else {
+      highlighted = hljs.highlightAuto(raw).value;
+    }
+
+    // Wrap each line in a span with data-source-line.
+    // _line is the opening ```, so code lines start at _line + 1.
+    let wrappedInner = highlighted;
+    if (token._line != null) {
+      const codeStartLine = token._line + 1;
+      const lines = highlighted.split("\n");
+      wrappedInner = lines
+        .map((l, i) => {
+          if (i === lines.length - 1 && l === "") {
+            return "";
+          }
+          return `<span data-source-line="${codeStartLine + i}">${l}</span>`;
+        })
+        .join("\n");
+    }
+
+    const langClass = langString ? `hljs language-${langString}` : "hljs";
+    return `<pre><code class="${langClass}">${wrappedInner}</code></pre>\n`;
+  },
+  blockquote(this: { parser: { parse(tokens: Token[]): string } }, token: Tokens.Blockquote & { _line?: number }) {
+    const body = this.parser.parse(token.tokens);
+    return `<blockquote>\n${body}</blockquote>\n`;
+  },
+  heading(this: { parser: { parseInline(tokens: Token[]): string } }, token: Tokens.Heading & { _line?: number }) {
+    const text = this.parser.parseInline(token.tokens);
+    return injectLineAttr(`<h${token.depth}>${text}</h${token.depth}>\n`, token._line);
+  },
+  hr(token: Tokens.Hr & { _line?: number }) {
+    return injectLineAttr("<hr>\n", token._line);
+  },
+  list(this: { parser: { parse(tokens: Token[], loose: boolean): string } }, token: Tokens.List & { _line?: number }) {
+    const ordered = token.ordered;
+    const start = token.start;
+    let body = "";
+    for (const item of token.items) {
+      const itemWithLine = item as Tokens.ListItem & { _line?: number };
+      let itemBody = "";
+      if (item.task) {
+        const checkbox = `<input ${item.checked ? 'checked="" ' : ''}disabled="" type="checkbox">`;
+        if (item.loose) {
+          if (item.tokens[0]?.type === "paragraph") {
+            const pToken = item.tokens[0] as Tokens.Paragraph;
+            item.tokens[0] = { ...pToken, text: checkbox + " " + pToken.text } as Tokens.Paragraph;
+          }
+        } else {
+          itemBody += checkbox + " ";
+        }
+      }
+      itemBody += this.parser.parse(item.tokens, !!item.loose);
+      body += injectLineAttr(`<li>${itemBody}</li>\n`, itemWithLine._line);
+    }
+    const type = ordered ? "ol" : "ul";
+    const startAttr = ordered && start !== 1 ? ` start="${start}"` : "";
+    return `<${type}${startAttr}>\n${body}</${type}>\n`;
+  },
+  paragraph(this: { parser: { parseInline(tokens: Token[]): string } }, token: Tokens.Paragraph & { _line?: number }) {
+    return injectLineAttr(`<p>${this.parser.parseInline(token.tokens)}</p>\n`, token._line);
+  },
+  table(this: { parser: { parseInline(tokens: Token[]): string } }, token: Tokens.Table & { _line?: number; _headerLine?: number; _rowLines?: number[] }) {
+    let header = "";
+    let cell = "";
+    for (let j = 0; j < token.header.length; j++) {
+      const h = token.header[j];
+      const align = h.align ? ` align="${h.align}"` : "";
+      cell += `<th${align}>${this.parser.parseInline(h.tokens)}</th>\n`;
+    }
+    header += injectLineAttr(`<tr>\n${cell}</tr>\n`, token._headerLine);
+    let body = "";
+    for (let i = 0; i < token.rows.length; i++) {
+      const row = token.rows[i];
+      let rowStr = "";
+      for (let j = 0; j < row.length; j++) {
+        const c = row[j];
+        const align = c.align ? ` align="${c.align}"` : "";
+        rowStr += `<td${align}>${this.parser.parseInline(c.tokens)}</td>\n`;
+      }
+      body += injectLineAttr(`<tr>\n${rowStr}</tr>\n`, token._rowLines?.[i]);
+    }
+    return `<table>\n<thead>\n${header}</thead>\n<tbody>${body}</tbody>\n</table>\n`;
+  },
+};
+
 const marked = new Marked(
   markedHighlight({
     langPrefix: "hljs language-",
@@ -37,12 +177,34 @@ const marked = new Marked(
       }
       return hljs.highlightAuto(code).value;
     },
-  })
+  }),
+  { renderer: lineRenderer },
 );
 
+/** Render with no line-tracking (for annotation content, etc.) */
+const markedPlain = new Marked(
+  markedHighlight({
+    langPrefix: "hljs language-",
+    highlight(code: string, lang: string) {
+      if (lang && hljs.getLanguage(lang)) {
+        return hljs.highlight(code, { language: lang }).value;
+      }
+      return hljs.highlightAuto(code).value;
+    },
+  }),
+);
+
+function renderMarkdownWithLines(text: string, startLine: number): string {
+  const tokens = marked.lexer(text);
+  assignLineNumbers(tokens, startLine);
+  return marked.parser(tokens);
+}
+
 const api: MdviewApi = {
-  renderMarkdown: (text: string) =>
-    marked.parse(text, { async: false }) as string,
+  renderMarkdown: (text: string, startLine?: number) =>
+    startLine != null
+      ? renderMarkdownWithLines(text, startLine)
+      : (markedPlain.parse(text, { async: false }) as string),
 
   onFileUpdated: (callback: (data: FileData) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, data: FileData): void =>

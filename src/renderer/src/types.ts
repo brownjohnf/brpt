@@ -1,4 +1,4 @@
-import type { DiffMode } from "../../shared/types";
+import type { Annotation, DiffMode } from "../../shared/types";
 
 export type {
   Annotation,

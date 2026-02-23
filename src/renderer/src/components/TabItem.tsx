@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 import { classNames } from "../classNames";
 import type { Tab } from "../types";
 
@@ -41,7 +41,7 @@ export function TabItem({
   onClick,
   onClose,
   onReorderTab,
-}: TabItemProps): JSX.Element {
+}: TabItemProps): ReactNode {
   const filename = getFilename(tab.path);
   const prefix = groupRootPath
     ? getRelativePrefix(tab.path, groupRootPath)

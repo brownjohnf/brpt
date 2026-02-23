@@ -83,6 +83,7 @@ Uses `electron-builder` (config in `electron-builder.yml`). The app is unsigned 
 - **Tab state**: `useReducer` in `App.tsx` manages tabs + activeIndex atomically via `tabsReducer.ts`. Actions: `OPEN_FILE`, `CLOSE_TAB`, `ACTIVATE_TAB`, `FILE_UPDATED`.
 - **Tab grouping**: `containerFolders` in config define project roots. Tabs whose paths fall under a root are grouped in the sidebar. Others appear under "Ungrouped".
 - **brpt CLI**: Shell script in `resources/brpt`, symlinked to `/usr/local/bin/brpt` on install. Supports dev-mode forwarding — reads `brpt_development_roots` from config, detects running `electron-vite dev` instances via `pgrep`, and forwards files using `open -a` with the dev Electron.app. Falls back to the packaged app when no dev instance is running.
+- **Viewer features must be pluggable.** Every feature (gutter line measurement, annotations, top bar controls, etc.) may work differently between viewer types (markdown, diff, future types). Never hardcode a feature's logic to a specific renderer. Shared UI components (like the gutter) should accept data/callbacks from the viewer, not query the DOM themselves. Each viewer provides its own implementation of how a feature works.
 
 ## Expected Behaviors
 

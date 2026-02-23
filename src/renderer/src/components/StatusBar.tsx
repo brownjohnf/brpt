@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 interface StatusBarProps {
   path: string | null;
@@ -49,7 +49,7 @@ function useIsRecent(instant: Temporal.Instant | null): boolean {
 export function StatusBar({
   path,
   lastModifiedAt,
-}: StatusBarProps): JSX.Element {
+}: StatusBarProps): ReactNode {
   const isRecent = useIsRecent(lastModifiedAt);
 
   return (

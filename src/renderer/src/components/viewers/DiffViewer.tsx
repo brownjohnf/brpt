@@ -1,11 +1,37 @@
 import "diff2html/bundles/css/diff2html.min.css";
 import { html } from "diff2html";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { classNames } from "../../classNames";
 import type { Annotation, DiffTab } from "../../types";
+import { AnnotationGutter, type GutterLine } from "../AnnotationGutter";
 import { SegmentedControl } from "../ui-elements/SegmentedControl";
 
 const { mdview } = window;
+
+function measureDiffByFilesLines(contentEl: HTMLElement, gutterEl: HTMLElement): GutterLine[] {
+  const gutterRect = gutterEl.getBoundingClientRect();
+  const rows = contentEl.querySelectorAll<HTMLElement>("tr:not(.d2h-info)");
+  const result: GutterLine[] = [];
+  for (const row of rows) {
+    const lineNum2 = row.querySelector<HTMLElement>(".line-num2");
+    const text = lineNum2?.textContent?.trim();
+    if (!text) {
+      continue;
+    }
+    const line = parseInt(text, 10);
+    if (isNaN(line)) {
+      continue;
+    }
+    const rect = row.getBoundingClientRect();
+    result.push({
+      line,
+      endLine: line,
+      top: rect.top - gutterRect.top,
+      bottom: rect.bottom - gutterRect.top,
+    });
+  }
+  return result;
+}
 
 type DiffViewMode = "line-by-line" | "side-by-side";
 
@@ -68,6 +94,8 @@ function mapNewLineNumbersToDiffLines(diffText: string): Map<number, number> {
 interface DiffAnnotationChunk {
   diffHtml: string;
   annotations: Annotation[];
+  startLine: number;
+  endLine: number;
 }
 
 function buildDiffAnnotatedChunks(
@@ -126,12 +154,17 @@ function buildDiffAnnotatedChunks(
         matching: "lines",
         colorScheme: "auto" as never,
       });
-      chunks.push({ diffHtml, annotations: byDiffLine.get(bp)! });
+      chunks.push({
+        diffHtml,
+        annotations: byDiffLine.get(bp)!,
+        startLine: cursor + 1,
+        endLine: lineIdx,
+      });
       cursor = lineIdx;
     } else if (chunks.length > 0) {
       chunks[chunks.length - 1].annotations.push(...byDiffLine.get(bp)!);
     } else {
-      chunks.push({ diffHtml: "", annotations: byDiffLine.get(bp)! });
+      chunks.push({ diffHtml: "", annotations: byDiffLine.get(bp)!, startLine: 1, endLine: 0 });
     }
   }
 
@@ -143,14 +176,20 @@ function buildDiffAnnotatedChunks(
       matching: "lines",
       colorScheme: "auto" as never,
     });
-    chunks.push({ diffHtml, annotations: [] });
+    chunks.push({
+      diffHtml,
+      annotations: [],
+      startLine: cursor + 1,
+      endLine: diffLines.length,
+    });
   }
 
   return chunks;
 }
 
-export function DiffContent({ tab, viewMode }: DiffContentProps): JSX.Element {
+export function DiffContent({ tab, viewMode }: DiffContentProps): ReactNode {
   const hasAnnotations = tab.annotations && tab.annotations.length > 0;
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const diffHtml = useMemo(() => {
     if (hasAnnotations) {
@@ -171,41 +210,47 @@ export function DiffContent({ tab, viewMode }: DiffContentProps): JSX.Element {
     return buildDiffAnnotatedChunks(tab.diff, tab.annotations!, tab.mode);
   }, [tab.diff, tab.annotations, tab.mode, hasAnnotations]);
 
-  if (annotatedChunks) {
-    return (
+  return (
+    <div className="flex min-h-full">
+      <AnnotationGutter
+        contentRef={contentRef}
+        measureLines={tab.mode === "diff-by-files" ? measureDiffByFilesLines : measureDiffByFilesLines}
+        deps={[tab.diff, tab.annotations]}
+        annotations={tab.annotations}
+      />
       <div
+        ref={contentRef}
         className={classNames(
-          "diff-viewer",
-          "d2h-unified",
+          "diff-viewer flex-1 min-w-0 pl-8",
+          annotatedChunks ? "d2h-unified" : (viewMode === "side-by-side" ? "d2h-side-by-side" : "d2h-unified"),
         )}
       >
-        {annotatedChunks.map((chunk, i) => (
-          <div key={i}>
-            {chunk.diffHtml && (
-              <div dangerouslySetInnerHTML={{ __html: chunk.diffHtml }} />
-            )}
-            {chunk.annotations.map((a, j) => (
-              <div key={j} className="annotation-block">
+        {annotatedChunks ? (
+          annotatedChunks.map((chunk, i) => (
+            <div key={i}>
+              {chunk.diffHtml && (
                 <div
-                  className="markdown-body"
-                  dangerouslySetInnerHTML={{ __html: renderAnnotationContent(a) }}
+                  data-chunk-lines={`${chunk.startLine}-${chunk.endLine}`}
+                  dangerouslySetInnerHTML={{ __html: chunk.diffHtml }}
                 />
-              </div>
-            ))}
-          </div>
-        ))}
+              )}
+              {chunk.annotations.map((a, j) => (
+                <div key={j} className="annotation-wrapper">
+                  <div className="annotation-block">
+                    <div
+                      className="markdown-body"
+                      dangerouslySetInnerHTML={{ __html: renderAnnotationContent(a) }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))
+        ) : (
+          <div dangerouslySetInnerHTML={{ __html: diffHtml! }} />
+        )}
       </div>
-    );
-  }
-
-  return (
-    <div
-      className={classNames(
-        "diff-viewer",
-        viewMode === "side-by-side" ? "d2h-side-by-side" : "d2h-unified",
-      )}
-      dangerouslySetInnerHTML={{ __html: diffHtml! }}
-    />
+    </div>
   );
 }
 
@@ -224,7 +269,7 @@ export function DiffTopBarContent({
   tab,
   viewMode,
   onChangeViewMode,
-}: DiffTopBarContentProps): JSX.Element {
+}: DiffTopBarContentProps): ReactNode {
   const label = tab.oldContent != null
     ? `${fileLabel(tab.path)} \u2194 ${fileLabel(tab.path)}`
     : fileLabel(tab.path);
