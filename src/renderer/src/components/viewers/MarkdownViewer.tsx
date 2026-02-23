@@ -130,7 +130,10 @@ export function MarkdownTopBarContent({
 function measureMarkdownLines(contentEl: HTMLElement, gutterEl: HTMLElement): GutterLine[] {
   const gutterRect = gutterEl.getBoundingClientRect();
   const allElements = contentEl.querySelectorAll<HTMLElement>("[data-source-line]");
-  const elements = Array.from(allElements).filter(e => !e.closest(".annotation-block"));
+  const elements = Array.from(allElements).filter(e =>
+    !e.closest(".annotation-block") &&
+    !e.querySelector("[data-source-line]")
+  );
   const raw: { line: number; top: number; bottom: number }[] = [];
 
   for (const element of elements) {
@@ -154,6 +157,13 @@ interface MarkdownContentProps {
   tab: MarkdownTab;
   contentWidth: ContentWidthConfig;
   onRetryRemoved: (path: string) => void;
+}
+
+function renderAnnotationContent(a: Annotation): string {
+  if (a.format === "markdown") {
+    return mdview.renderMarkdown(a.content);
+  }
+  return mdview.renderMarkdown(a.content);
 }
 
 function annotationInsertionLine(a: Annotation): number {
@@ -239,6 +249,22 @@ export function MarkdownContent({
 }: MarkdownContentProps): ReactNode {
   const hasAnnotations = tab.annotations && tab.annotations.length > 0;
   const contentRef = useRef<HTMLDivElement>(null);
+  const [collapsedInsertionLines, setCollapsedInsertionLines] = useState<Set<number>>(new Set());
+
+  const handleDotClick = useCallback((insertionLines: number[]) => {
+    setCollapsedInsertionLines((prev) => {
+      const next = new Set(prev);
+      const allCollapsed = insertionLines.every((il) => next.has(il));
+      for (const il of insertionLines) {
+        if (allCollapsed) {
+          next.delete(il);
+        } else {
+          next.add(il);
+        }
+      }
+      return next;
+    });
+  }, []);
 
   const renderedHtml = useMemo(() => {
     if (hasAnnotations) {
@@ -296,8 +322,10 @@ export function MarkdownContent({
         <AnnotationGutter
           contentRef={contentRef}
           measureLines={measureMarkdownLines}
-          deps={[tab.content, tab.annotations]}
+          deps={[tab.content, tab.annotations, collapsedInsertionLines]}
           annotations={tab.annotations}
+          collapsedInsertionLines={collapsedInsertionLines}
+          onDotClick={handleDotClick}
         />
         <div ref={contentRef} className="flex-1 min-w-0 pl-8">
           <div className="mx-auto" style={contentStyle}>
@@ -311,7 +339,16 @@ export function MarkdownContent({
                     dangerouslySetInnerHTML={{ __html: chunk.html }}
                   />
                 )}
-                {/* Annotations collapsed for now */}
+                {!collapsedInsertionLines.has(chunk.endLine) && chunk.annotations.map((a, j) => (
+                  <div key={j} className="annotation-wrapper">
+                    <div className="annotation-block">
+                      <div
+                        className="markdown-body"
+                        dangerouslySetInnerHTML={{ __html: renderAnnotationContent(a) }}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
             ))
           ) : (

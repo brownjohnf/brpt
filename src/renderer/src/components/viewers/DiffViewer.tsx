@@ -1,6 +1,6 @@
 import "diff2html/bundles/css/diff2html.min.css";
 import { html } from "diff2html";
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { classNames } from "../../classNames";
 import type { Annotation, DiffTab } from "../../types";
 import { AnnotationGutter, type GutterLine } from "../AnnotationGutter";
@@ -190,6 +190,22 @@ function buildDiffAnnotatedChunks(
 export function DiffContent({ tab, viewMode }: DiffContentProps): ReactNode {
   const hasAnnotations = tab.annotations && tab.annotations.length > 0;
   const contentRef = useRef<HTMLDivElement>(null);
+  const [collapsedInsertionLines, setCollapsedInsertionLines] = useState<Set<number>>(new Set());
+
+  const handleDotClick = useCallback((insertionLines: number[]) => {
+    setCollapsedInsertionLines((prev) => {
+      const next = new Set(prev);
+      const allCollapsed = insertionLines.every((il) => next.has(il));
+      for (const il of insertionLines) {
+        if (allCollapsed) {
+          next.delete(il);
+        } else {
+          next.add(il);
+        }
+      }
+      return next;
+    });
+  }, []);
 
   const diffHtml = useMemo(() => {
     if (hasAnnotations) {
@@ -215,8 +231,10 @@ export function DiffContent({ tab, viewMode }: DiffContentProps): ReactNode {
       <AnnotationGutter
         contentRef={contentRef}
         measureLines={tab.mode === "diff-by-files" ? measureDiffByFilesLines : measureDiffByFilesLines}
-        deps={[tab.diff, tab.annotations]}
+        deps={[tab.diff, tab.annotations, collapsedInsertionLines]}
         annotations={tab.annotations}
+        collapsedInsertionLines={collapsedInsertionLines}
+        onDotClick={handleDotClick}
       />
       <div
         ref={contentRef}
@@ -234,7 +252,7 @@ export function DiffContent({ tab, viewMode }: DiffContentProps): ReactNode {
                   dangerouslySetInnerHTML={{ __html: chunk.diffHtml }}
                 />
               )}
-              {chunk.annotations.map((a, j) => (
+              {!collapsedInsertionLines.has(chunk.endLine) && chunk.annotations.map((a, j) => (
                 <div key={j} className="annotation-wrapper">
                   <div className="annotation-block">
                     <div

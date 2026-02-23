@@ -85,8 +85,9 @@ body[data-theme="dark"] {
 
 .annotation-gutter {
   position: relative;
-  width: 28px;
   flex-shrink: 0;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
   background: var(--tab-hover-bg);
   min-height: 100%;
   margin-top: -32px;
@@ -105,7 +106,6 @@ body[data-theme="dark"] {
 }
 
 .gutter-line-number {
-  font-size: 11px;
   line-height: 1;
   text-align: right;
   padding-right: 4px;
@@ -120,6 +120,10 @@ body[data-theme="dark"] {
   margin-top: -1px;
 }
 
+.gutter-line-entry--clickable {
+  cursor: pointer;
+}
+
 .gutter-annotation-dot {
   width: 8px;
   height: 8px;
@@ -129,6 +133,11 @@ body[data-theme="dark"] {
   position: absolute;
   left: 4px;
   bottom: 5px;
+  transition: opacity 0.15s;
+}
+
+.gutter-annotation-dot--collapsed {
+  opacity: 0.35;
 }
 
 .gutter-annotation-range-line {
@@ -136,6 +145,11 @@ body[data-theme="dark"] {
   left: 7px;
   width: 2px;
   background: var(--tab-changed-dot);
+  transition: opacity 0.15s;
+}
+
+.gutter-annotation-range-line--collapsed {
+  opacity: 0.35;
 }
 
 /* diff2html overrides */
