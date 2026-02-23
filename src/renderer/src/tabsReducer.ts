@@ -1,4 +1,4 @@
-import type { DiffData, DiffTab, FileData, MarkdownTab, Tab } from "./types";
+import type { Annotation, DiffData, DiffTab, FileData, MarkdownTab, Tab } from "./types";
 
 export interface TabsState {
   tabs: Tab[];
@@ -13,7 +13,8 @@ export type TabsAction =
   | { type: "FILE_REMOVED"; path: string }
   | { type: "REORDER_TAB"; fromIndex: number; toIndex: number }
   | { type: "OPEN_DIFF"; data: DiffData }
-  | { type: "DIFF_UPDATED"; data: DiffData };
+  | { type: "DIFF_UPDATED"; data: DiffData }
+  | { type: "SET_ANNOTATIONS"; targetPath: string; annotationPath: string; annotations: Annotation[] };
 
 export const initialTabsState: TabsState = {
   tabs: [],
@@ -185,6 +186,20 @@ export function tabsReducer(state: TabsState, action: TabsAction): TabsState {
         activeIndex = state.activeIndex + 1;
       }
       return { tabs, activeIndex };
+    }
+
+    case "SET_ANNOTATIONS": {
+      const index = state.tabs.findIndex((t) => t.path === action.targetPath);
+      if (index === -1) {
+        return state;
+      }
+      const tabs = [...state.tabs];
+      tabs[index] = {
+        ...tabs[index],
+        annotationPath: action.annotationPath,
+        annotations: action.annotations,
+      };
+      return { tabs, activeIndex: state.activeIndex };
     }
   }
 }

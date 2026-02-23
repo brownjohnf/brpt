@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type RefObject } from "react";
 import { classNames } from "../../classNames";
-import type { ContentWidthConfig, ContentWidthMode, MarkdownTab } from "../../types";
+import type { Annotation, ContentWidthConfig, ContentWidthMode, MarkdownTab } from "../../types";
 import { useCurrentHeading } from "../../useCurrentHeading";
 import { SegmentedControl } from "../ui-elements/SegmentedControl";
 
@@ -132,14 +132,96 @@ interface MarkdownContentProps {
   onRetryRemoved: (path: string) => void;
 }
 
+function annotationInsertionLine(a: Annotation): number {
+  if (a.startLine != null && a.endLine != null) {
+    return a.endLine;
+  }
+  return a.line ?? 0;
+}
+
+function renderAnnotationContent(a: Annotation): string {
+  if (a.format === "markdown") {
+    return mdview.renderMarkdown(a.content);
+  }
+  // Future: "html" would pass through, "text" would escape and wrap in <pre>
+  return mdview.renderMarkdown(a.content);
+}
+
+interface AnnotatedChunk {
+  html: string;
+  annotations: Annotation[];
+}
+
+function buildAnnotatedChunks(content: string, annotations: Annotation[]): AnnotatedChunk[] {
+  const lines = content.split("\n");
+  const sorted = [...annotations].sort(
+    (a, b) => annotationInsertionLine(a) - annotationInsertionLine(b),
+  );
+
+  // Group annotations by their insertion line
+  const byLine = new Map<number, Annotation[]>();
+  for (const a of sorted) {
+    const line = annotationInsertionLine(a);
+    const group = byLine.get(line);
+    if (group) {
+      group.push(a);
+    } else {
+      byLine.set(line, [a]);
+    }
+  }
+
+  // Get sorted unique insertion points
+  const breakpoints = [...byLine.keys()].sort((a, b) => a - b);
+
+  const chunks: AnnotatedChunk[] = [];
+  let cursor = 0;
+
+  for (const bp of breakpoints) {
+    // Clamp to valid line range (1-indexed)
+    const lineIdx = Math.min(bp, lines.length);
+    if (lineIdx > cursor) {
+      const chunk = lines.slice(cursor, lineIdx).join("\n");
+      chunks.push({ html: mdview.renderMarkdown(chunk), annotations: byLine.get(bp)! });
+      cursor = lineIdx;
+    } else {
+      // Annotation at or before cursor — attach to previous chunk or create empty one
+      if (chunks.length > 0) {
+        chunks[chunks.length - 1].annotations.push(...byLine.get(bp)!);
+      } else {
+        chunks.push({ html: "", annotations: byLine.get(bp)! });
+      }
+    }
+  }
+
+  // Remaining content after the last annotation
+  if (cursor < lines.length) {
+    const chunk = lines.slice(cursor).join("\n");
+    chunks.push({ html: mdview.renderMarkdown(chunk), annotations: [] });
+  }
+
+  return chunks;
+}
+
 export function MarkdownContent({
   tab,
   contentWidth,
   onRetryRemoved,
 }: MarkdownContentProps): JSX.Element {
+  const hasAnnotations = tab.annotations && tab.annotations.length > 0;
+
   const renderedHtml = useMemo(() => {
+    if (hasAnnotations) {
+      return null;
+    }
     return mdview.renderMarkdown(tab.content);
-  }, [tab.content]);
+  }, [tab.content, hasAnnotations]);
+
+  const annotatedChunks = useMemo(() => {
+    if (!hasAnnotations) {
+      return null;
+    }
+    return buildAnnotatedChunks(tab.content, tab.annotations!);
+  }, [tab.content, tab.annotations, hasAnnotations]);
 
   const contentStyle: React.CSSProperties = (() => {
     switch (contentWidth.mode) {
@@ -179,11 +261,34 @@ export function MarkdownContent({
           </button>
         </div>
       )}
-      <div
-        className="markdown-body mx-auto"
-        style={contentStyle}
-        dangerouslySetInnerHTML={{ __html: renderedHtml }}
-      />
+      {annotatedChunks ? (
+        <div className="mx-auto" style={contentStyle}>
+          {annotatedChunks.map((chunk, i) => (
+            <div key={i}>
+              {chunk.html && (
+                <div
+                  className="markdown-body"
+                  dangerouslySetInnerHTML={{ __html: chunk.html }}
+                />
+              )}
+              {chunk.annotations.map((a, j) => (
+                <div key={j} className="annotation-block">
+                  <div
+                    className="markdown-body"
+                    dangerouslySetInnerHTML={{ __html: renderAnnotationContent(a) }}
+                  />
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div
+          className="markdown-body mx-auto"
+          style={contentStyle}
+          dangerouslySetInnerHTML={{ __html: renderedHtml! }}
+        />
+      )}
     </>
   );
 }

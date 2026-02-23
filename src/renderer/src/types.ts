@@ -1,6 +1,8 @@
 import type { DiffMode } from "../../shared/types";
 
 export type {
+  Annotation,
+  AnnotationData,
   AppConfig,
   ContentWidthConfig,
   ContentWidthMode,
@@ -8,6 +10,7 @@ export type {
   DiffMode,
   FileData,
   OpenEntry,
+  OpenFileEntry,
   SavedDiff,
 } from "../../shared/types";
 
@@ -17,6 +20,8 @@ export interface BaseTab {
   lastModifiedAt: Temporal.Instant | null;
   hasUnseenChanges: boolean;
   removed?: boolean;
+  annotationPath?: string;
+  annotations?: Annotation[];
 }
 
 export interface MarkdownTab extends BaseTab {

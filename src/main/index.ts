@@ -5,7 +5,16 @@ import { app, BrowserWindow, dialog, ipcMain, screen, shell } from "electron";
 import fs from "fs";
 import os from "os";
 import { basename, dirname, join, resolve } from "path";
-import type { AppConfig, DiffData, FileData, OpenEntry, SavedDiff } from "../shared/types";
+import type {
+  Annotation,
+  AnnotationData,
+  AppConfig,
+  DiffData,
+  FileData,
+  OpenEntry,
+  OpenFileEntry,
+  SavedDiff,
+} from "../shared/types";
 
 const DEFAULT_CONFIG: AppConfig = {
   theme: "light",
@@ -34,6 +43,9 @@ interface DiffWatch {
   secondPath: string;
 }
 const diffWatches = new Map<string, DiffWatch>();
+
+/** Maps annotation file path → the target file it annotates */
+const annotationWatches = new Map<string, string>();
 
 function loadConfig(): AppConfig {
   try {
@@ -150,9 +162,72 @@ function handleDiffFileChange(dw: DiffWatch): void {
   }
 }
 
+function readAnnotations(annotationPath: string): Annotation[] | null {
+  try {
+    const raw = fs.readFileSync(annotationPath, "utf-8");
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed.annotations)) {
+      return parsed.annotations;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function watchAnnotationFile(annotationPath: string, targetPath: string): void {
+  const abs = resolveFilePath(annotationPath);
+  annotationWatches.set(abs, targetPath);
+  if (watchers.has(abs)) {
+    return;
+  }
+
+  const watcher = watch(abs, { persistent: true });
+  watcher.on("change", () => {
+    const target = annotationWatches.get(abs);
+    if (!target || !mainWindow || mainWindow.isDestroyed()) {
+      return;
+    }
+    const annotations = readAnnotations(abs);
+    if (annotations) {
+      const data: AnnotationData = { targetPath: target, annotationPath: abs, annotations };
+      mainWindow.webContents.send("annotations-updated", data);
+    }
+  });
+  watcher.on("unlink", () => {
+    const target = annotationWatches.get(abs);
+    annotationWatches.delete(abs);
+    const w = watchers.get(abs);
+    if (w) {
+      w.close();
+      watchers.delete(abs);
+    }
+    if (target && mainWindow && !mainWindow.isDestroyed()) {
+      const data: AnnotationData = { targetPath: target, annotationPath: abs, annotations: [] };
+      mainWindow.webContents.send("annotations-updated", data);
+    }
+  });
+  watchers.set(abs, watcher);
+}
+
+function sendAnnotations(targetPath: string, annotationPath: string): void {
+  const absAnnotation = resolveFilePath(annotationPath);
+  const absTarget = resolveFilePath(targetPath);
+  const annotations = readAnnotations(absAnnotation);
+  if (!annotations || !mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  watchAnnotationFile(absAnnotation, absTarget);
+
+  const data: AnnotationData = { targetPath: absTarget, annotationPath: absAnnotation, annotations };
+  mainWindow.webContents.send("annotations-from-args", data);
+}
+
 interface ParsedCliArgs {
   markdownFiles: string[];
   diff?: DiffData;
+  annotate?: string;
 }
 
 function parseCliArgs(argv: string[]): ParsedCliArgs {
@@ -161,9 +236,22 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
   const hasDiff = argv.includes("--diff");
   const hasDiffByFiles = argv.includes("--diff-by-files");
 
-  // Collect non-flag, non-electron args (file paths are always last)
+  // Extract --annotate=<path> value (single arg to avoid Electron injecting flags between them)
+  let annotate: string | undefined;
+  for (const a of argv) {
+    if (a.startsWith("--annotate=")) {
+      annotate = resolveFilePath(a.slice("--annotate=".length));
+      break;
+    }
+  }
+
+  // Collect non-flag, non-electron args (file paths are always last).
   const filePaths = argv.filter(
-    (a) => !a.startsWith("-") && a !== "." && !a.includes("Electron") && !a.includes("electron"),
+    (a) =>
+      !a.startsWith("-") &&
+      a !== "." &&
+      !a.includes("Electron") &&
+      !a.includes("electron"),
   );
 
   if (hasDiff && filePaths.length >= 2) {
@@ -175,6 +263,7 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
     if (newFile && diffFile) {
       return {
         markdownFiles: [],
+        annotate,
         diff: {
           mode: "diff",
           newPath,
@@ -202,6 +291,7 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
       );
       return {
         markdownFiles: [],
+        annotate,
         diff: {
           mode: "diff-by-files",
           newPath,
@@ -219,7 +309,7 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
     .filter((a) => a.endsWith(".md"))
     .map((a) => resolveFilePath(a));
 
-  return { markdownFiles };
+  return { markdownFiles, annotate };
 }
 
 function openFilesAndSend(filePaths: string[]): void {
@@ -307,15 +397,34 @@ function buildDiffData(saved: SavedDiff): DiffData | null {
   }
 }
 
+function unwrapEntry(entry: OpenEntry): { inner: string | SavedDiff; annotationFile?: string } {
+  if (typeof entry === "string") {
+    return { inner: entry };
+  }
+  if ("entry" in entry) {
+    const envelope = entry as OpenFileEntry;
+    return { inner: envelope.entry, annotationFile: envelope.annotationFile };
+  }
+  return { inner: entry };
+}
+
 function restoreSessionEntries(entries: OpenEntry[]): void {
   const filePaths: string[] = [];
   const diffs: SavedDiff[] = [];
+  const annotationQueue: { targetPath: string; annotationFile: string }[] = [];
 
   for (const entry of entries) {
-    if (typeof entry === "string") {
-      filePaths.push(entry);
+    const { inner, annotationFile } = unwrapEntry(entry);
+    if (typeof inner === "string") {
+      filePaths.push(inner);
+      if (annotationFile) {
+        annotationQueue.push({ targetPath: resolveFilePath(inner), annotationFile });
+      }
     } else {
-      diffs.push(entry);
+      diffs.push(inner);
+      if (annotationFile) {
+        annotationQueue.push({ targetPath: resolveFilePath(inner.file), annotationFile });
+      }
     }
   }
 
@@ -328,6 +437,10 @@ function restoreSessionEntries(entries: OpenEntry[]): void {
     if (data) {
       openDiffAndSend(data, saved.type, resolveFilePath(secondPathFor(saved)));
     }
+  }
+
+  for (const { targetPath, annotationFile } of annotationQueue) {
+    sendAnnotations(targetPath, annotationFile);
   }
 }
 
@@ -431,6 +544,15 @@ function createWindow(): void {
       mainWindow.webContents.send("diff-from-args", pendingDiff);
       pendingDiff = null;
     }
+
+    if (parsed.annotate) {
+      const targetPath = parsed.diff
+        ? parsed.diff.newPath
+        : parsed.markdownFiles[parsed.markdownFiles.length - 1];
+      if (targetPath) {
+        sendAnnotations(targetPath, parsed.annotate);
+      }
+    }
   });
 
   mainWindow.on("closed", () => {
@@ -475,6 +597,15 @@ if (!gotTheLock) {
 
     if (parsed.markdownFiles.length > 0) {
       openFilesAndSend(parsed.markdownFiles);
+    }
+
+    if (parsed.annotate) {
+      const targetPath = parsed.diff
+        ? parsed.diff.newPath
+        : parsed.markdownFiles[parsed.markdownFiles.length - 1];
+      if (targetPath) {
+        sendAnnotations(targetPath, parsed.annotate);
+      }
     }
 
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -538,6 +669,31 @@ ipcMain.handle("request-file", (_event, filePath: string) => {
   return null;
 });
 
+ipcMain.handle("request-diff", (_event, newPath: string, diffPath: string) => {
+  const absNew = resolveFilePath(newPath);
+  const absDiff = resolveFilePath(diffPath);
+  const newFile = readFile(absNew);
+  const diffFile = readFile(absDiff);
+  if (!newFile || !diffFile) {
+    return null;
+  }
+  const data: DiffData = {
+    mode: "diff",
+    newPath: absNew,
+    newContent: newFile.content,
+    secondPath: absDiff,
+    diff: diffFile.content,
+  };
+
+  const dw: DiffWatch = { mode: "diff", newPath: absNew, secondPath: absDiff };
+  watchFile(absNew);
+  diffWatches.set(absNew, dw);
+  watchFile(absDiff);
+  diffWatches.set(absDiff, dw);
+
+  return data;
+});
+
 ipcMain.handle("request-diff-by-files", (_event, newPath: string, oldPath: string) => {
   const absNew = resolveFilePath(newPath);
   const absOld = resolveFilePath(oldPath);
@@ -570,8 +726,16 @@ ipcMain.handle("request-diff-by-files", (_event, newPath: string, oldPath: strin
   return data;
 });
 
-ipcMain.on("close-file", (_event, filePath: string) => {
+ipcMain.on("request-annotations", (_event, targetPath: string, annotationPath: string) => {
+  sendAnnotations(targetPath, annotationPath);
+});
+
+ipcMain.on("close-file", (_event, filePath: string, annotationPath?: string) => {
   unwatchFile(filePath);
+  if (annotationPath) {
+    annotationWatches.delete(resolveFilePath(annotationPath));
+    unwatchFile(annotationPath);
+  }
 });
 
 ipcMain.handle("get-config", () => {

@@ -68,6 +68,18 @@ body[data-theme="dark"] {
   background: transparent !important;
 }
 
+.annotation-block {
+  border-left: 3px solid var(--tab-changed-dot);
+  background: var(--tab-hover-bg);
+  padding: 8px 12px;
+  margin: 8px 0;
+  border-radius: 4px;
+}
+
+.annotation-block .markdown-body {
+  font-size: 0.9em;
+}
+
 /* diff2html overrides */
 .diff-viewer .d2h-file-header {
   display: none;

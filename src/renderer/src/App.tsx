@@ -16,6 +16,7 @@ import {
 } from "./components/viewers/MarkdownViewer";
 import { initialTabsState, tabsReducer } from "./tabsReducer";
 import type {
+  AnnotationData,
   AppConfig,
   ContentWidthConfig,
   ContentWidthMode,
@@ -23,6 +24,8 @@ import type {
   DiffTab,
   FileData,
   OpenEntry,
+  OpenFileEntry,
+  SavedDiff,
 } from "./types";
 import { groupTabs } from "./groupTabs";
 import { useThemeStyles } from "./useThemeStyles";
@@ -45,7 +48,7 @@ export default function App(): JSX.Element {
   const [quickGotoOpen, setQuickGotoOpen] = useState(false);
   const mainRef = useRef<HTMLDivElement>(null);
   const configLoaded = useRef(false);
-  const recentlyClosed = useRef<string[]>([]);
+  const recentlyClosed = useRef<OpenEntry[]>([]);
 
   const activeTab =
     activeIndex >= 0 && activeIndex < tabs.length ? tabs[activeIndex] : null;
@@ -63,11 +66,24 @@ export default function App(): JSX.Element {
   const closeTab = useCallback(
     (index: number) => {
       if (index >= 0 && index < tabs.length) {
-        recentlyClosed.current.push(tabs[index].path);
+        const tab = tabs[index];
+        let inner: string | SavedDiff;
+        if (tab.kind === "diff") {
+          const dt = tab as DiffTab;
+          inner = dt.mode === "diff"
+            ? { type: "diff" as const, file: dt.path, diffFile: dt.secondPath }
+            : { type: "diff-by-files" as const, file: dt.path, oldFile: dt.secondPath };
+        } else {
+          inner = tab.path;
+        }
+        const entry: OpenEntry = tab.annotationPath
+          ? { entry: inner, annotationFile: tab.annotationPath }
+          : inner;
+        recentlyClosed.current.push(entry);
         if (recentlyClosed.current.length > 20) {
           recentlyClosed.current.shift();
         }
-        mdview.closeFile(tabs[index].path);
+        mdview.closeFile(tab.path, tab.annotationPath);
       }
       dispatch({ type: "CLOSE_TAB", index });
     },
@@ -168,13 +184,21 @@ export default function App(): JSX.Element {
       const entries: OpenEntry[] = tabs
         .filter((t) => !t.removed)
         .map((t) => {
+          let inner: string | SavedDiff;
           if (t.kind === "diff") {
             const dt = t as DiffTab;
-            return dt.mode === "diff"
+            inner = dt.mode === "diff"
               ? { type: "diff" as const, file: dt.path, diffFile: dt.secondPath }
               : { type: "diff-by-files" as const, file: dt.path, oldFile: dt.secondPath };
+          } else {
+            inner = t.path;
           }
-          return t.path;
+
+          if (t.annotationPath) {
+            const envelope: OpenFileEntry = { entry: inner, annotationFile: t.annotationPath };
+            return envelope;
+          }
+          return inner;
         });
       mdview.saveOpenFiles(entries);
     }
@@ -204,6 +228,22 @@ export default function App(): JSX.Element {
       }),
       mdview.onDiffUpdated((data: DiffData) => {
         dispatch({ type: "DIFF_UPDATED", data });
+      }),
+      mdview.onAnnotationsFromArgs((data: AnnotationData) => {
+        dispatch({
+          type: "SET_ANNOTATIONS",
+          targetPath: data.targetPath,
+          annotationPath: data.annotationPath,
+          annotations: data.annotations,
+        });
+      }),
+      mdview.onAnnotationsUpdated((data: AnnotationData) => {
+        dispatch({
+          type: "SET_ANNOTATIONS",
+          targetPath: data.targetPath,
+          annotationPath: data.annotationPath,
+          annotations: data.annotations,
+        });
       }),
       mdview.onConfigLoaded((config: AppConfig) => {
         configLoaded.current = true;
@@ -298,13 +338,38 @@ export default function App(): JSX.Element {
       }
       if (mod && e.shiftKey && e.key === "t") {
         e.preventDefault();
-        const path = recentlyClosed.current.pop();
-        if (path) {
-          mdview.requestFile(path).then((result) => {
-            if (result) {
-              openFile(result);
-            }
-          });
+        const entry = recentlyClosed.current.pop();
+        if (entry) {
+          const inner = typeof entry === "string" ? entry : entry.entry;
+          const annotationFile = typeof entry === "string" ? undefined : entry.annotationFile;
+          if (typeof inner === "string") {
+            mdview.requestFile(inner).then((result) => {
+              if (result) {
+                openFile(result);
+                if (annotationFile) {
+                  mdview.requestAnnotations(inner, annotationFile);
+                }
+              }
+            });
+          } else if (inner.type === "diff") {
+            mdview.requestDiff(inner.file, inner.diffFile).then((result) => {
+              if (result) {
+                openDiff(result);
+                if (annotationFile) {
+                  mdview.requestAnnotations(inner.file, annotationFile);
+                }
+              }
+            });
+          } else if (inner.type === "diff-by-files") {
+            mdview.requestDiffByFiles(inner.file, inner.oldFile).then((result) => {
+              if (result) {
+                openDiff(result);
+                if (annotationFile) {
+                  mdview.requestAnnotations(inner.file, annotationFile);
+                }
+              }
+            });
+          }
         }
         return;
       }

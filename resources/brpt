@@ -70,6 +70,11 @@ def main():
         help="Open a diff view computed from two files",
     )
     parser.add_argument(
+        "--annotate",
+        metavar="ANNOTATION_FILE",
+        help="Attach an annotation JSON file to the opened tab",
+    )
+    parser.add_argument(
         "files",
         nargs="*",
         help="Markdown files to open",
@@ -106,8 +111,23 @@ def main():
         # Launch the binary directly so Electron's single-instance lock
         # forwards args to a running instance via the second-instance event.
         app_bin = find_app_binary(target_app)
-        subprocess.run([app_bin, flag, new_file, second_file])
+        cmd = [app_bin, flag, new_file, second_file]
+        if args.annotate:
+            annotate_path = resolve_path(args.annotate)
+            if not os.path.isfile(annotate_path):
+                print(f"brpt: {args.annotate}: No such file", file=sys.stderr)
+                sys.exit(1)
+            cmd.append(f"--annotate={annotate_path}")
+        subprocess.run(cmd)
         sys.exit(0)
+
+    annotate_arg = None
+    if args.annotate:
+        annotate_path = resolve_path(args.annotate)
+        if not os.path.isfile(annotate_path):
+            print(f"brpt: {args.annotate}: No such file", file=sys.stderr)
+            sys.exit(1)
+        annotate_arg = f"--annotate={annotate_path}"
 
     resolved_files = []
     for path in args.files:
@@ -120,7 +140,13 @@ def main():
     if args.files and not resolved_files:
         sys.exit(1)
 
-    if resolved_files:
+    if annotate_arg:
+        # Must use binary directly so --annotate gets forwarded through
+        # Electron's single-instance lock (macOS `open` strips extra args).
+        app_bin = find_app_binary(target_app)
+        cmd = [app_bin] + resolved_files + [annotate_arg]
+        subprocess.run(cmd)
+    elif resolved_files:
         subprocess.run(["open", "-a", target_app] + resolved_files)
     else:
         subprocess.run(["open", "-a", target_app])

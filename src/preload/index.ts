@@ -3,8 +3,8 @@ import hljs from "highlight.js";
 import { Marked } from "marked";
 import { markedHighlight } from "marked-highlight";
 import os from "os";
-import type { AppConfig, DiffData, FileData, OpenEntry } from "../shared/types";
-export type { AppConfig, DiffData, FileData, OpenEntry };
+import type { AnnotationData, AppConfig, DiffData, FileData, OpenEntry } from "../shared/types";
+export type { AnnotationData, AppConfig, DiffData, FileData, OpenEntry };
 
 export interface MdviewApi {
   renderMarkdown(text: string): string;
@@ -13,10 +13,15 @@ export interface MdviewApi {
   onFilesFromArgs(callback: (files: FileData[]) => void): () => void;
   onDiffFromArgs(callback: (data: DiffData) => void): () => void;
   onDiffUpdated(callback: (data: DiffData) => void): () => void;
+  onAnnotationsFromArgs(callback: (data: AnnotationData) => void): () => void;
+  onAnnotationsUpdated(callback: (data: AnnotationData) => void): () => void;
   onConfigLoaded(callback: (config: AppConfig) => void): () => void;
   openFileDialog(): Promise<FileData[]>;
   requestFile(filePath: string): Promise<FileData | null>;
-  closeFile(filePath: string): void;
+  requestDiff(newPath: string, diffPath: string): Promise<DiffData | null>;
+  requestDiffByFiles(newPath: string, oldPath: string): Promise<DiffData | null>;
+  requestAnnotations(targetPath: string, annotationPath: string): void;
+  closeFile(filePath: string, annotationPath?: string): void;
   getConfig(): Promise<AppConfig>;
   setConfig(key: string, value: unknown): void;
   saveOpenFiles(entries: OpenEntry[]): void;
@@ -81,6 +86,22 @@ const api: MdviewApi = {
       ipcRenderer.removeListener("diff-updated", listener);
     };
   },
+  onAnnotationsFromArgs: (callback: (data: AnnotationData) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, data: AnnotationData): void =>
+      callback(data);
+    ipcRenderer.on("annotations-from-args", listener);
+    return () => {
+      ipcRenderer.removeListener("annotations-from-args", listener);
+    };
+  },
+  onAnnotationsUpdated: (callback: (data: AnnotationData) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, data: AnnotationData): void =>
+      callback(data);
+    ipcRenderer.on("annotations-updated", listener);
+    return () => {
+      ipcRenderer.removeListener("annotations-updated", listener);
+    };
+  },
   onConfigLoaded: (callback: (config: AppConfig) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, config: AppConfig): void =>
       callback(config);
@@ -92,7 +113,14 @@ const api: MdviewApi = {
   openFileDialog: () => ipcRenderer.invoke("open-file-dialog"),
   requestFile: (filePath: string) =>
     ipcRenderer.invoke("request-file", filePath),
-  closeFile: (filePath: string) => ipcRenderer.send("close-file", filePath),
+  requestDiff: (newPath: string, diffPath: string) =>
+    ipcRenderer.invoke("request-diff", newPath, diffPath),
+  requestDiffByFiles: (newPath: string, oldPath: string) =>
+    ipcRenderer.invoke("request-diff-by-files", newPath, oldPath),
+  requestAnnotations: (targetPath: string, annotationPath: string) =>
+    ipcRenderer.send("request-annotations", targetPath, annotationPath),
+  closeFile: (filePath: string, annotationPath?: string) =>
+    ipcRenderer.send("close-file", filePath, annotationPath),
   getConfig: () => ipcRenderer.invoke("get-config"),
   setConfig: (key: string, value: unknown) =>
     ipcRenderer.send("set-config", key, value),

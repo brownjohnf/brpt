@@ -19,7 +19,26 @@ export type SavedDiff =
   | { type: "diff"; file: string; diffFile: string }
   | { type: "diff-by-files"; file: string; oldFile: string };
 
-export type OpenEntry = string | SavedDiff;
+export interface Annotation {
+  line?: number;
+  startLine?: number;
+  endLine?: number;
+  format: string;
+  content: string;
+}
+
+export interface AnnotationData {
+  targetPath: string;
+  annotationPath: string;
+  annotations: Annotation[];
+}
+
+export interface OpenFileEntry {
+  entry: string | SavedDiff;
+  annotationFile?: string;
+}
+
+export type OpenEntry = string | OpenFileEntry;
 
 export interface AppConfig {
   theme: "light" | "dark";
