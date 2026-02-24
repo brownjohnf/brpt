@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { annotationInsertionLine } from "../../../../shared/annotations";
 import { classNames } from "../../classNames";
-import type { Annotation, ContentWidthConfig, ContentWidthMode, MarkdownTab } from "../../types";
+import type { Annotation, ContentWidthConfig, ContentWidthMode, MarkdownTab, ViewerCapabilities } from "../../types";
 import { AnnotationGutter, type GutterLine } from "../AnnotationGutter";
 import { useCurrentHeading } from "../../useCurrentHeading";
 import { SegmentedControl } from "../ui-elements/SegmentedControl";
 
 const { mdview } = window;
+
+export function markdownCapabilities(tab: MarkdownTab): ViewerCapabilities {
+  return { draggablePath: tab.path };
+}
 
 const modeOptions: { value: ContentWidthMode; label: string }[] = [
   { value: "fixed", label: "Fixed" },
@@ -157,20 +162,6 @@ interface MarkdownContentProps {
   tab: MarkdownTab;
   contentWidth: ContentWidthConfig;
   onRetryRemoved: (path: string) => void;
-}
-
-function renderAnnotationContent(a: Annotation): string {
-  if (a.format === "markdown") {
-    return mdview.renderMarkdown(a.content);
-  }
-  return mdview.renderMarkdown(a.content);
-}
-
-function annotationInsertionLine(a: Annotation): number {
-  if (a.startLine != null && a.endLine != null) {
-    return a.endLine;
-  }
-  return a.line ?? 0;
 }
 
 interface AnnotatedChunk {
@@ -344,7 +335,7 @@ export function MarkdownContent({
                     <div className="annotation-block">
                       <div
                         className="markdown-body"
-                        dangerouslySetInnerHTML={{ __html: renderAnnotationContent(a) }}
+                        dangerouslySetInnerHTML={{ __html: mdview.renderMarkdown(a.content) }}
                       />
                     </div>
                   </div>

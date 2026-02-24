@@ -40,3 +40,7 @@ export interface DiffTab extends BaseTab {
 }
 
 export type Tab = MarkdownTab | DiffTab;
+
+export interface ViewerCapabilities {
+  draggablePath?: string;
+}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 import { toast, Toaster } from "sonner";
 import { ContentArea } from "./components/ContentArea";
 import { QuickGoto } from "./components/QuickGoto";
@@ -8,11 +8,13 @@ import { TopBar } from "./components/TopBar";
 import {
   DiffContent,
   DiffTopBarContent,
+  diffCapabilities,
   useDiffViewMode,
 } from "./components/viewers/DiffViewer";
 import {
   MarkdownContent,
   MarkdownTopBarContent,
+  markdownCapabilities,
 } from "./components/viewers/MarkdownViewer";
 import { initialTabsState, tabsReducer } from "./tabsReducer";
 import type {
@@ -52,6 +54,13 @@ export default function App(): ReactNode {
 
   const activeTab =
     activeIndex >= 0 && activeIndex < tabs.length ? tabs[activeIndex] : null;
+
+  const capabilities = useMemo(() => {
+    if (!activeTab) { return {}; }
+    if (activeTab.kind === "markdown") { return markdownCapabilities(activeTab); }
+    if (activeTab.kind === "diff") { return diffCapabilities(activeTab); }
+    return {};
+  }, [activeTab]);
 
   const [diffViewMode, setDiffViewMode] = useDiffViewMode();
 
@@ -214,6 +223,14 @@ export default function App(): ReactNode {
     }
   }, [activeIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const applyConfig = useCallback((config: AppConfig) => {
+    configLoaded.current = true;
+    if (config.theme) { setTheme(config.theme); }
+    if (config.containerFolders) { setContainerFolders(config.containerFolders); }
+    if (config.contentWidth) { setContentWidth((prev) => ({ ...prev, ...config.contentWidth })); }
+    if (config.sidebarWidth != null) { setSidebarWidth(config.sidebarWidth); }
+  }, []);
+
   // IPC listeners
   useEffect(() => {
     const unsubs = [
@@ -248,24 +265,14 @@ export default function App(): ReactNode {
           annotations: data.annotations,
         });
       }),
-      mdview.onConfigLoaded((config: AppConfig) => {
-        configLoaded.current = true;
-        if (config.theme) {
-          setTheme(config.theme);
-        }
-        if (config.containerFolders) {
-          setContainerFolders(config.containerFolders);
-        }
-        if (config.contentWidth) {
-          setContentWidth((prev) => ({ ...prev, ...config.contentWidth }));
-        }
-        if (config.sidebarWidth != null) {
-          setSidebarWidth(config.sidebarWidth);
-        }
-      }),
+      mdview.onConfigLoaded(applyConfig),
     ];
     return () => unsubs.forEach((fn) => fn());
-  }, [openFile, openDiff]);
+  }, [openFile, openDiff, applyConfig]);
+
+  useEffect(() => {
+    mdview.getConfig().then(applyConfig);
+  }, [applyConfig]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -481,6 +488,7 @@ export default function App(): ReactNode {
       <StatusBar
         path={activeTab?.path ?? null}
         lastModifiedAt={activeTab?.lastModifiedAt ?? null}
+        draggablePath={capabilities.draggablePath}
       />
       <Toaster theme={theme} position="bottom-center" style={{ bottom: "28px" }} />
       {quickGotoOpen && (

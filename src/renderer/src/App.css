@@ -125,14 +125,10 @@ body[data-theme="dark"] {
 }
 
 .gutter-annotation-dot {
-  width: 8px;
-  height: 8px;
   border-radius: 50%;
   background: var(--tab-changed-dot);
   flex-shrink: 0;
   position: absolute;
-  left: 4px;
-  bottom: 5px;
   transition: opacity 0.15s;
 }
 
@@ -142,7 +138,6 @@ body[data-theme="dark"] {
 
 .gutter-annotation-range-line {
   position: absolute;
-  left: 7px;
   width: 2px;
   background: var(--tab-changed-dot);
   transition: opacity 0.15s;

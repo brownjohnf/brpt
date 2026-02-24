@@ -2,11 +2,16 @@ import "diff2html/bundles/css/diff2html.min.css";
 import { html } from "diff2html";
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { classNames } from "../../classNames";
-import type { Annotation, DiffTab } from "../../types";
+import { annotationInsertionLine } from "../../../../shared/annotations";
+import type { Annotation, DiffTab, ViewerCapabilities } from "../../types";
 import { AnnotationGutter, type GutterLine } from "../AnnotationGutter";
 import { SegmentedControl } from "../ui-elements/SegmentedControl";
 
 const { mdview } = window;
+
+export function diffCapabilities(tab: DiffTab): ViewerCapabilities {
+  return { draggablePath: tab.path };
+}
 
 function measureDiffByFilesLines(contentEl: HTMLElement, gutterEl: HTMLElement): GutterLine[] {
   const gutterRect = gutterEl.getBoundingClientRect();
@@ -43,20 +48,6 @@ const viewModeOptions: { value: DiffViewMode; label: string }[] = [
 interface DiffContentProps {
   tab: DiffTab;
   viewMode: DiffViewMode;
-}
-
-function annotationInsertionLine(a: Annotation): number {
-  if (a.startLine != null && a.endLine != null) {
-    return a.endLine;
-  }
-  return a.line ?? 0;
-}
-
-function renderAnnotationContent(a: Annotation): string {
-  if (a.format === "markdown") {
-    return mdview.renderMarkdown(a.content);
-  }
-  return mdview.renderMarkdown(a.content);
 }
 
 /**
@@ -230,7 +221,7 @@ export function DiffContent({ tab, viewMode }: DiffContentProps): ReactNode {
     <div className="flex min-h-full">
       <AnnotationGutter
         contentRef={contentRef}
-        measureLines={tab.mode === "diff-by-files" ? measureDiffByFilesLines : measureDiffByFilesLines}
+        measureLines={measureDiffByFilesLines}
         deps={[tab.diff, tab.annotations, collapsedInsertionLines]}
         annotations={tab.annotations}
         collapsedInsertionLines={collapsedInsertionLines}
@@ -257,7 +248,7 @@ export function DiffContent({ tab, viewMode }: DiffContentProps): ReactNode {
                   <div className="annotation-block">
                     <div
                       className="markdown-body"
-                      dangerouslySetInnerHTML={{ __html: renderAnnotationContent(a) }}
+                      dangerouslySetInnerHTML={{ __html: mdview.renderMarkdown(a.content) }}
                     />
                   </div>
                 </div>

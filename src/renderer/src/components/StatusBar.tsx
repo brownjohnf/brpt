@@ -1,8 +1,9 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 interface StatusBarProps {
   path: string | null;
   lastModifiedAt: Temporal.Instant | null;
+  draggablePath?: string;
 }
 
 const RECENCY_THRESHOLD_MS = 30_000;
@@ -46,20 +47,59 @@ function useIsRecent(instant: Temporal.Instant | null): boolean {
   return remaining > 0 && !expired;
 }
 
+function FileIcon(): ReactNode {
+  return (
+    <svg
+      width="12"
+      height="14"
+      viewBox="0 0 12 14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M7 1H2.5A1.5 1.5 0 0 0 1 2.5v9A1.5 1.5 0 0 0 2.5 13h7a1.5 1.5 0 0 0 1.5-1.5V5L7 1Z" />
+      <polyline points="7 1 7 5 11 5" />
+    </svg>
+  );
+}
+
 export function StatusBar({
   path,
   lastModifiedAt,
+  draggablePath,
 }: StatusBarProps): ReactNode {
   const isRecent = useIsRecent(lastModifiedAt);
+
+  const handleDragStart = useCallback(
+    (e: React.DragEvent) => {
+      if (draggablePath) {
+        e.preventDefault();
+        window.mdview.startFileDrag(draggablePath);
+      }
+    },
+    [draggablePath],
+  );
 
   return (
     <div
       className="
-        h-7 flex items-center px-3 text-xs
+        h-7 flex items-center px-3 text-xs gap-2
         bg-[var(--status-bg)] border-t border-[var(--status-border)]
         text-[var(--status-text)]
       "
     >
+      {draggablePath && (
+        <span
+          draggable="true"
+          onDragStart={handleDragStart}
+          className="shrink-0 cursor-grab opacity-60 hover:opacity-100 transition-opacity"
+          title="Drag to share file"
+        >
+          <FileIcon />
+        </span>
+      )}
       <span className="overflow-hidden text-ellipsis whitespace-nowrap">
         {path ? `Watching: ${path}` : ""}
       </span>

@@ -753,3 +753,8 @@ ipcMain.on("save-open-files", (_event, entries: OpenEntry[]) => {
   config.openFiles = entries;
   saveConfig(config);
 });
+
+ipcMain.on("start-file-drag", async (event, filePath: string) => {
+  const icon = await app.getFileIcon(filePath, { size: "small" });
+  event.sender.startDrag({ file: filePath, icon });
+});

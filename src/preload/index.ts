@@ -25,6 +25,7 @@ export interface MdviewApi {
   getConfig(): Promise<AppConfig>;
   setConfig(key: string, value: unknown): void;
   saveOpenFiles(entries: OpenEntry[]): void;
+  startFileDrag(filePath: string): void;
   homedir: string;
 }
 
@@ -288,6 +289,8 @@ const api: MdviewApi = {
     ipcRenderer.send("set-config", key, value),
   saveOpenFiles: (entries: OpenEntry[]) =>
     ipcRenderer.send("save-open-files", entries),
+  startFileDrag: (filePath: string) =>
+    ipcRenderer.send("start-file-drag", filePath),
   homedir: os.homedir(),
 };
 

@@ -109,6 +109,8 @@ Never say "Honestly" - you're always honest to the best of your ability.
 
 ## Code Guidelines
 
+- **No dedicated type files by default.** Modern TypeScript has `import type`, so there is generally no need to segregate types into separate files. Types, interfaces, and the functions that operate on them belong together in the same module. Code can be split across files for organizational purposes, and occasionally a type file makes sense, but the default should be co-location.
+- **Build in dependency order.** When adding new code, define the function/constant first, then add the import, then add the call site. Never leave the build broken mid-edit.
 - Always use curly braces for `if` statements, even single-line ones.
 - Avoid ternary expressions inside string templates.
 - Never use the phrase "code smell" - describe the issue directly.

@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { annotationInsertionLine } from "../../../shared/annotations";
 import { classNames } from "../classNames";
 import type { Annotation } from "../types";
+
+const DOT_SIZE = 8;
+const DOT_BOTTOM = 5;
+const DOT_LEFT = 4;
+const DOT_RADIUS = DOT_SIZE / 2;
+const DOT_CENTER_FROM_BOTTOM = DOT_BOTTOM + DOT_RADIUS;
+const RANGE_LINE_WIDTH = 2;
+const RANGE_LINE_LEFT = DOT_LEFT + DOT_RADIUS - RANGE_LINE_WIDTH / 2;
 
 export interface GutterLine {
   line: number;
@@ -31,13 +40,6 @@ function findLineEntry(lines: GutterLine[], targetLine: number): GutterLine | nu
     }
   }
   return firstAfter;
-}
-
-function annotationInsertionLine(a: Annotation): number {
-  if (a.startLine != null && a.endLine != null) {
-    return a.endLine;
-  }
-  return a.line ?? 0;
 }
 
 export function AnnotationGutter({
@@ -81,46 +83,29 @@ export function AnnotationGutter({
     if (!annotations) {
       return { annotatedLines: set, dotInsertionLines: dotMap };
     }
+
+    function markEntry(entry: GutterLine, insertionLine: number) {
+      set.add(entry.endLine);
+      const existing = dotMap.get(entry.endLine);
+      if (existing) {
+        if (!existing.includes(insertionLine)) {
+          existing.push(insertionLine);
+        }
+      } else {
+        dotMap.set(entry.endLine, [insertionLine]);
+      }
+    }
+
     for (const a of annotations) {
       const insertionLine = annotationInsertionLine(a);
       if (a.startLine != null && a.endLine != null) {
         const startEntry = findLineEntry(lines, a.startLine);
         const endEntry = findLineEntry(lines, a.endLine);
-        if (startEntry) {
-          set.add(startEntry.endLine);
-          const existing = dotMap.get(startEntry.endLine);
-          if (existing) {
-            if (!existing.includes(insertionLine)) {
-              existing.push(insertionLine);
-            }
-          } else {
-            dotMap.set(startEntry.endLine, [insertionLine]);
-          }
-        }
-        if (endEntry) {
-          set.add(endEntry.endLine);
-          const existing = dotMap.get(endEntry.endLine);
-          if (existing) {
-            if (!existing.includes(insertionLine)) {
-              existing.push(insertionLine);
-            }
-          } else {
-            dotMap.set(endEntry.endLine, [insertionLine]);
-          }
-        }
+        if (startEntry) { markEntry(startEntry, insertionLine); }
+        if (endEntry) { markEntry(endEntry, insertionLine); }
       } else if (a.line != null) {
         const entry = findLineEntry(lines, a.line);
-        if (entry) {
-          set.add(entry.endLine);
-          const existing = dotMap.get(entry.endLine);
-          if (existing) {
-            if (!existing.includes(insertionLine)) {
-              existing.push(insertionLine);
-            }
-          } else {
-            dotMap.set(entry.endLine, [insertionLine]);
-          }
-        }
+        if (entry) { markEntry(entry, insertionLine); }
       }
     }
     return { annotatedLines: set, dotInsertionLines: dotMap };
@@ -137,12 +122,10 @@ export function AnnotationGutter({
         const startEntry = findLineEntry(lines, a.startLine);
         const endEntry = findLineEntry(lines, a.endLine);
         if (startEntry && endEntry && startEntry !== endEntry) {
-          const dotOffset = 9;
-          const dotRadius = 4;
           result.push({
             key: i,
-            top: startEntry.bottom - dotOffset + dotRadius,
-            bottom: endEntry.bottom - dotOffset - dotRadius,
+            top: startEntry.bottom - DOT_CENTER_FROM_BOTTOM + DOT_RADIUS,
+            bottom: endEntry.bottom - DOT_CENTER_FROM_BOTTOM - DOT_RADIUS,
             insertionLine: annotationInsertionLine(a),
           });
         }
@@ -184,10 +167,18 @@ export function AnnotationGutter({
               : undefined}
           >
             {hasDot && (
-              <div className={classNames(
-                "gutter-annotation-dot",
-                isCollapsed && "gutter-annotation-dot--collapsed",
-              )} />
+              <div
+                className={classNames(
+                  "gutter-annotation-dot",
+                  isCollapsed && "gutter-annotation-dot--collapsed",
+                )}
+                style={{
+                  width: DOT_SIZE,
+                  height: DOT_SIZE,
+                  left: DOT_LEFT,
+                  bottom: DOT_BOTTOM,
+                }}
+              />
             )}
             <span className="gutter-line-number">{l.line}</span>
             <div className="gutter-line-divider" />
@@ -201,7 +192,7 @@ export function AnnotationGutter({
             "gutter-annotation-range-line",
             collapsedInsertionLines?.has(r.insertionLine) && "gutter-annotation-range-line--collapsed",
           )}
-          style={{ top: r.top, height: r.bottom - r.top }}
+          style={{ top: r.top, height: r.bottom - r.top, left: RANGE_LINE_LEFT, width: RANGE_LINE_WIDTH }}
         />
       ))}
     </div>
