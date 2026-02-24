@@ -1,6 +1,6 @@
 import "diff2html/bundles/css/diff2html.min.css";
 import { html } from "diff2html";
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { classNames } from "../../classNames";
 import { annotationInsertionLine } from "../../../../shared/annotations";
 import type { Annotation, DiffTab, ViewerCapabilities } from "../../types";
@@ -180,7 +180,7 @@ function buildDiffAnnotatedChunks(
 
 export function DiffContent({ tab, viewMode }: DiffContentProps): ReactNode {
   const hasAnnotations = tab.annotations && tab.annotations.length > 0;
-  const contentRef = useRef<HTMLDivElement>(null);
+  const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null);
   const [collapsedInsertionLines, setCollapsedInsertionLines] = useState<Set<number>>(new Set());
 
   const handleDotClick = useCallback((insertionLines: number[]) => {
@@ -220,7 +220,7 @@ export function DiffContent({ tab, viewMode }: DiffContentProps): ReactNode {
   return (
     <div className="flex min-h-full">
       <AnnotationGutter
-        contentRef={contentRef}
+        contentEl={contentEl}
         measureLines={measureDiffByFilesLines}
         deps={[tab.diff, tab.annotations, collapsedInsertionLines]}
         annotations={tab.annotations}
@@ -228,7 +228,7 @@ export function DiffContent({ tab, viewMode }: DiffContentProps): ReactNode {
         onDotClick={handleDotClick}
       />
       <div
-        ref={contentRef}
+        ref={setContentEl}
         className={classNames(
           "diff-viewer flex-1 min-w-0 pl-8",
           annotatedChunks ? "d2h-unified" : (viewMode === "side-by-side" ? "d2h-side-by-side" : "d2h-unified"),

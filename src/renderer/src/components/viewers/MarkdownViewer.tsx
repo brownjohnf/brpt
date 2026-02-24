@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode, type RefObject } from "react";
 import { annotationInsertionLine } from "../../../../shared/annotations";
 import { classNames } from "../../classNames";
 import type { Annotation, ContentWidthConfig, ContentWidthMode, MarkdownTab, ViewerCapabilities } from "../../types";
@@ -139,17 +139,19 @@ function measureMarkdownLines(contentEl: HTMLElement, gutterEl: HTMLElement): Gu
     !e.closest(".annotation-block") &&
     !e.querySelector("[data-source-line]")
   );
-  const raw: { line: number; top: number; bottom: number }[] = [];
+  const byLine = new Map<number, { line: number; top: number; bottom: number }>();
 
   for (const element of elements) {
     const line = parseInt(element.dataset.sourceLine!, 10);
     const rect = element.getBoundingClientRect();
-    raw.push({
+    byLine.set(line, {
       line,
       top: rect.top - gutterRect.top,
       bottom: rect.bottom - gutterRect.top,
     });
   }
+
+  const raw = [...byLine.values()];
 
   return raw.map((entry, i) => {
     const nextLine = i < raw.length - 1 ? raw[i + 1].line : null;
@@ -239,7 +241,7 @@ export function MarkdownContent({
   onRetryRemoved,
 }: MarkdownContentProps): ReactNode {
   const hasAnnotations = tab.annotations && tab.annotations.length > 0;
-  const contentRef = useRef<HTMLDivElement>(null);
+  const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null);
   const [collapsedInsertionLines, setCollapsedInsertionLines] = useState<Set<number>>(new Set());
 
   const handleDotClick = useCallback((insertionLines: number[]) => {
@@ -311,14 +313,14 @@ export function MarkdownContent({
       )}
       <div className="flex min-h-full">
         <AnnotationGutter
-          contentRef={contentRef}
+          contentEl={contentEl}
           measureLines={measureMarkdownLines}
           deps={[tab.content, tab.annotations, collapsedInsertionLines]}
           annotations={tab.annotations}
           collapsedInsertionLines={collapsedInsertionLines}
           onDotClick={handleDotClick}
         />
-        <div ref={contentRef} className="flex-1 min-w-0 pl-8">
+        <div ref={setContentEl} className="flex-1 min-w-0 pl-8">
           <div className="mx-auto" style={contentStyle}>
           {annotatedChunks ? (
             annotatedChunks.map((chunk, i) => (

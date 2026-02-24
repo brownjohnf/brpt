@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { annotationInsertionLine } from "../../../shared/annotations";
 import { classNames } from "../classNames";
 import type { Annotation } from "../types";
@@ -21,7 +21,7 @@ export interface GutterLine {
 export type MeasureGutterLines = (contentEl: HTMLElement, gutterEl: HTMLElement) => GutterLine[];
 
 interface AnnotationGutterProps {
-  contentRef: RefObject<HTMLDivElement | null>;
+  contentEl: HTMLDivElement | null;
   measureLines: MeasureGutterLines;
   deps: unknown[];
   annotations: Annotation[] | undefined;
@@ -43,7 +43,7 @@ function findLineEntry(lines: GutterLine[], targetLine: number): GutterLine | nu
 }
 
 export function AnnotationGutter({
-  contentRef,
+  contentEl,
   measureLines,
   deps,
   annotations,
@@ -54,13 +54,12 @@ export function AnnotationGutter({
   const gutterRef = useRef<HTMLDivElement>(null);
 
   const measure = useCallback(() => {
-    const el = contentRef.current;
     const gutter = gutterRef.current;
-    if (!el || !gutter) {
+    if (!contentEl || !gutter) {
       return;
     }
-    setLines(measureLines(el, gutter));
-  }, [contentRef, measureLines]);
+    setLines(measureLines(contentEl, gutter));
+  }, [contentEl, measureLines]);
 
   useLayoutEffect(() => {
     measure();
@@ -68,14 +67,13 @@ export function AnnotationGutter({
   }, [measure, ...deps]);
 
   useEffect(() => {
-    const el = contentRef.current;
-    if (!el) {
+    if (!contentEl) {
       return;
     }
     const observer = new ResizeObserver(measure);
-    observer.observe(el);
+    observer.observe(contentEl);
     return () => observer.disconnect();
-  }, [contentRef, measure]);
+  }, [contentEl, measure]);
 
   const { annotatedLines, dotInsertionLines } = useMemo(() => {
     const set = new Set<number>();
