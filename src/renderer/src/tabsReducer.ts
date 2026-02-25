@@ -1,4 +1,4 @@
-import type { Annotation, DiffData, DiffTab, FileData, MarkdownTab, Tab } from "./types";
+import type { Annotation, BrptNotification, DiffData, DiffTab, FileData, MarkdownTab, Tab } from "./types";
 
 export interface TabsState {
   tabs: Tab[];
@@ -15,7 +15,10 @@ export type TabsAction =
   | { type: "OPEN_DIFF"; data: DiffData }
   | { type: "DIFF_UPDATED"; data: DiffData }
   | { type: "SET_ANNOTATIONS"; targetPath: string; annotationPath: string; annotations: Annotation[] }
-  | { type: "ACTIVATE_FILE_BY_PATH"; path: string };
+  | { type: "ACTIVATE_FILE_BY_PATH"; path: string }
+  | { type: "SET_NOTIFICATIONS"; path: string; notifications: BrptNotification[] }
+  | { type: "ADD_NOTIFICATION"; path: string; notification: BrptNotification }
+  | { type: "MARK_NOTIFICATIONS_READ"; path: string };
 
 export const initialTabsState: TabsState = {
   tabs: [],
@@ -43,6 +46,8 @@ export function tabsReducer(state: TabsState, action: TabsAction): TabsState {
           Math.floor(data.mtimeMs),
         ),
         hasUnseenChanges: false,
+        notifications: [],
+        unreadNotificationCount: 0,
       };
       const tabs = [...state.tabs, newTab];
       return { tabs, activeIndex: tabs.length - 1 };
@@ -74,6 +79,8 @@ export function tabsReducer(state: TabsState, action: TabsAction): TabsState {
         scrollTop: 0,
         lastModifiedAt: Temporal.Instant.fromEpochMilliseconds(Math.floor(data.mtimeMs)),
         hasUnseenChanges: false,
+        notifications: [],
+        unreadNotificationCount: 0,
       };
       const tabs = [...state.tabs, newTab];
       return { tabs, activeIndex: tabs.length - 1 };
@@ -209,6 +216,51 @@ export function tabsReducer(state: TabsState, action: TabsAction): TabsState {
         return state;
       }
       return { tabs: state.tabs, activeIndex: index };
+    }
+
+    case "SET_NOTIFICATIONS": {
+      const index = state.tabs.findIndex((t) => t.path === action.path);
+      if (index === -1) {
+        return state;
+      }
+      const tabs = [...state.tabs];
+      const unreadCount = action.notifications.filter((n) => !n.read).length;
+      tabs[index] = {
+        ...tabs[index],
+        notifications: action.notifications,
+        unreadNotificationCount: unreadCount,
+      };
+      return { tabs, activeIndex: state.activeIndex };
+    }
+
+    case "ADD_NOTIFICATION": {
+      const index = state.tabs.findIndex((t) => t.path === action.path);
+      if (index === -1) {
+        return state;
+      }
+      const tabs = [...state.tabs];
+      const tab = tabs[index];
+      tabs[index] = {
+        ...tab,
+        notifications: [...tab.notifications, action.notification],
+        unreadNotificationCount: tab.unreadNotificationCount + 1,
+      };
+      return { tabs, activeIndex: state.activeIndex };
+    }
+
+    case "MARK_NOTIFICATIONS_READ": {
+      const index = state.tabs.findIndex((t) => t.path === action.path);
+      if (index === -1) {
+        return state;
+      }
+      const tabs = [...state.tabs];
+      const tab = tabs[index];
+      tabs[index] = {
+        ...tab,
+        notifications: tab.notifications.map((n) => ({ ...n, read: true })),
+        unreadNotificationCount: 0,
+      };
+      return { tabs, activeIndex: state.activeIndex };
     }
   }
 }

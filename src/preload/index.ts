@@ -3,8 +3,8 @@ import hljs from "highlight.js";
 import { Marked, type Token, type Tokens } from "marked";
 import { markedHighlight } from "marked-highlight";
 import os from "os";
-import type { AnnotationData, AppConfig, DiffData, FileData, OpenEntry } from "../shared/types";
-export type { AnnotationData, AppConfig, DiffData, FileData, OpenEntry };
+import type { AnnotationData, AppConfig, BrptNotification, DiffData, FileData, OpenEntry } from "../shared/types";
+export type { AnnotationData, AppConfig, BrptNotification, DiffData, FileData, OpenEntry };
 
 export interface MdviewApi {
   renderMarkdown(text: string, startLine?: number): string;
@@ -26,6 +26,9 @@ export interface MdviewApi {
   getConfig(): Promise<AppConfig>;
   setConfig(key: string, value: unknown): void;
   saveOpenFiles(entries: OpenEntry[]): void;
+  onNotificationReceived(callback: (data: { targetPath: string; notification: BrptNotification }) => void): () => void;
+  getNotifications(targetPath: string): Promise<BrptNotification[]>;
+  markNotificationsRead(targetPath: string): void;
   startFileDrag(filePath: string): void;
   homedir: string;
 }
@@ -324,6 +327,18 @@ const api: MdviewApi = {
       ipcRenderer.removeListener("activate-file", listener);
     };
   },
+  onNotificationReceived: (callback: (data: { targetPath: string; notification: BrptNotification }) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, data: { targetPath: string; notification: BrptNotification }): void =>
+      callback(data);
+    ipcRenderer.on("notification-received", listener);
+    return () => {
+      ipcRenderer.removeListener("notification-received", listener);
+    };
+  },
+  getNotifications: (targetPath: string) =>
+    ipcRenderer.invoke("get-notifications", targetPath),
+  markNotificationsRead: (targetPath: string) =>
+    ipcRenderer.send("mark-notifications-read", targetPath),
   startFileDrag: (filePath: string) =>
     ipcRenderer.send("start-file-drag", filePath),
   homedir: os.homedir(),

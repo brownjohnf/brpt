@@ -70,6 +70,10 @@ body[data-theme="dark"] {
   background: transparent !important;
 }
 
+.notification-content .markdown-body pre {
+  background-color: var(--sidebar-bg) !important;
+}
+
 .annotation-wrapper {
   interpolate-size: allow-keywords;
   height: auto;

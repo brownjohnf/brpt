@@ -1,5 +1,6 @@
 import { is } from "@electron-toolkit/utils";
 import { FSWatcher, watch } from "chokidar";
+import { createHash } from "crypto";
 import { createTwoFilesPatch } from "diff";
 import { app, BrowserWindow, dialog, ipcMain, screen, shell } from "electron";
 import fs from "fs";
@@ -9,6 +10,7 @@ import type {
   Annotation,
   AnnotationData,
   AppConfig,
+  BrptNotification,
   DiffData,
   FileData,
   OpenEntry,
@@ -29,6 +31,7 @@ const DEFAULT_CONFIG: AppConfig = {
 
 const DEFAULT_CONFIG_PATH = join(os.homedir(), ".brpt", "brpt-config.json");
 const CONFIG_PATH = process.env.BRPT_CONFIG || DEFAULT_CONFIG_PATH;
+const NOTIFICATIONS_DIR = join(dirname(CONFIG_PATH), "notifications");
 
 let mainWindow: BrowserWindow | null = null;
 let windowReady = false;
@@ -76,6 +79,47 @@ function readFile(filePath: string): { content: string; mtimeMs: number } | null
   } catch {
     return null;
   }
+}
+
+function notificationFileFor(targetPath: string): string {
+  const hash = createHash("sha256").update(targetPath).digest("hex").slice(0, 16);
+  return join(NOTIFICATIONS_DIR, `${hash}.json`);
+}
+
+function loadNotifications(targetPath: string): BrptNotification[] {
+  try {
+    const raw = fs.readFileSync(notificationFileFor(targetPath), "utf-8");
+    const parsed = JSON.parse(raw);
+    return parsed.notifications ?? [];
+  } catch {
+    return [];
+  }
+}
+
+function saveNotifications(targetPath: string, notifications: BrptNotification[]): void {
+  try {
+    fs.mkdirSync(NOTIFICATIONS_DIR, { recursive: true });
+    fs.writeFileSync(
+      notificationFileFor(targetPath),
+      JSON.stringify({ targetPath, notifications }, null, 2),
+    );
+  } catch (err) {
+    console.error("Failed to save notifications:", err);
+  }
+}
+
+function appendNotification(targetPath: string, content: string): BrptNotification {
+  const notifications = loadNotifications(targetPath);
+  const now = new Date().toISOString();
+  const notification: BrptNotification = {
+    id: now,
+    content,
+    receivedAt: now,
+    read: false,
+  };
+  notifications.push(notification);
+  saveNotifications(targetPath, notifications);
+  return notification;
 }
 
 function watchFile(filePath: string): void {
@@ -230,6 +274,8 @@ interface ParsedCliArgs {
   markdownFiles: string[];
   diff?: DiffData;
   annotate?: string;
+  notify?: { targetPath: string; message: string };
+  foreground: boolean;
 }
 
 function parseCliArgs(argv: string[]): ParsedCliArgs {
@@ -237,12 +283,22 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
   // for our flags and collect trailing non-flag file paths separately.
   const hasDiff = argv.includes("--diff");
   const hasDiffByFiles = argv.includes("--diff-by-files");
+  const foreground = argv.includes("--foreground");
 
   // Extract --annotate=<path> value (single arg to avoid Electron injecting flags between them)
   let annotate: string | undefined;
   for (const a of argv) {
     if (a.startsWith("--annotate=")) {
       annotate = resolveFilePath(a.slice("--annotate=".length));
+      break;
+    }
+  }
+
+  // Extract --notify=<path> value
+  let notifyTargetPath: string | undefined;
+  for (const a of argv) {
+    if (a.startsWith("--notify=")) {
+      notifyTargetPath = resolveFilePath(a.slice("--notify=".length));
       break;
     }
   }
@@ -256,6 +312,16 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
       !a.includes("electron"),
   );
 
+  // When --notify is present, the last positional arg is the message
+  if (notifyTargetPath && filePaths.length >= 1) {
+    const message = filePaths[filePaths.length - 1];
+    return {
+      markdownFiles: [],
+      foreground,
+      notify: { targetPath: notifyTargetPath, message },
+    };
+  }
+
   if (hasDiff && filePaths.length >= 2) {
     const newPath = resolveFilePath(filePaths[filePaths.length - 2]);
     const diffPath = resolveFilePath(filePaths[filePaths.length - 1]);
@@ -265,6 +331,7 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
     if (newFile && diffFile) {
       return {
         markdownFiles: [],
+        foreground,
         annotate,
         diff: {
           mode: "diff",
@@ -276,7 +343,7 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
         },
       };
     }
-    return { markdownFiles: [] };
+    return { markdownFiles: [], foreground };
   }
 
   if (hasDiffByFiles && filePaths.length >= 2) {
@@ -294,6 +361,7 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
       );
       return {
         markdownFiles: [],
+        foreground,
         annotate,
         diff: {
           mode: "diff-by-files",
@@ -306,14 +374,14 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
         },
       };
     }
-    return { markdownFiles: [] };
+    return { markdownFiles: [], foreground };
   }
 
   const markdownFiles = filePaths
     .filter((a) => a.endsWith(".md"))
     .map((a) => resolveFilePath(a));
 
-  return { markdownFiles, annotate };
+  return { markdownFiles, foreground, annotate };
 }
 
 function openFilesAndSend(filePaths: string[]): void {
@@ -604,6 +672,14 @@ if (!gotTheLock) {
   app.on("second-instance", (_event, argv) => {
     const parsed = parseCliArgs(argv);
 
+    if (parsed.notify) {
+      const { targetPath, message } = parsed.notify;
+      const notification = appendNotification(targetPath, message);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("notification-received", { targetPath, notification });
+      }
+    }
+
     if (parsed.diff) {
       openDiffAndSend(parsed.diff, parsed.diff.mode, parsed.diff.secondPath);
     }
@@ -621,7 +697,8 @@ if (!gotTheLock) {
       }
     }
 
-    if (mainWindow && !mainWindow.isDestroyed()) {
+    const shouldFocus = parsed.foreground || !parsed.notify;
+    if (shouldFocus && mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) {
         mainWindow.restore();
       }
@@ -767,6 +844,17 @@ ipcMain.on("save-open-files", (_event, entries: OpenEntry[]) => {
   const config = loadConfig();
   config.openFiles = entries;
   saveConfig(config);
+});
+
+ipcMain.handle("get-notifications", (_event, targetPath: string) => {
+  return loadNotifications(resolveFilePath(targetPath));
+});
+
+ipcMain.on("mark-notifications-read", (_event, targetPath: string) => {
+  const absPath = resolveFilePath(targetPath);
+  const notifications = loadNotifications(absPath);
+  const updated = notifications.map((n) => ({ ...n, read: true }));
+  saveNotifications(absPath, updated);
 });
 
 ipcMain.on("start-file-drag", async (event, filePath: string) => {

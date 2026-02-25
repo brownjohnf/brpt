@@ -55,6 +55,13 @@ export interface AppConfig {
   sidebarWidth?: number;
 }
 
+export interface BrptNotification {
+  id: string;
+  content: string;
+  receivedAt: string;
+  read: boolean;
+}
+
 export interface FileData {
   path: string;
   content: string;

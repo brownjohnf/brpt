@@ -69,6 +69,8 @@ USAGE
     brpt --diff-by-files <new-file> <old-file>
     brpt <file> --annotate <annotation-file>
     brpt --diff-by-files <new> <old> --annotate <annotation-file>
+    brpt --notify <target-file> <message>
+    brpt --foreground --notify <target-file> <message>
 
 MODES
 
@@ -167,6 +169,23 @@ ANNOTATIONS
     4. Both files are watched — update either one and the preview
        refreshes automatically.
 
+NOTIFICATIONS
+
+    brpt --notify README.md "Check the **formatting** on line 12."
+    brpt --foreground --notify README.md "Build failed — see errors."
+
+    Notifications send a markdown message associated with a target file.
+    The message is persisted to disk and delivered to the app. If the
+    target file is open as a tab, a bell icon appears in the status bar
+    with an unread indicator. Click the bell to open the notification
+    drawer.
+
+    By default, --notify sends without bringing the app to the
+    foreground. Add --foreground to also focus the window.
+
+    Notifications are designed for programmatic use — other tools (CI,
+    linters, AI agents) can push messages into brpt about specific files.
+
 OPTIONS
 
     --diff NEW_FILE DIFF_FILE
@@ -177,6 +196,15 @@ OPTIONS
 
     --annotate ANNOTATION_FILE
         Attach an annotation JSON file to the opened tab.
+
+    --notify TARGET_FILE MESSAGE
+        Send a markdown notification associated with the target file.
+        The message is stored and delivered to the app. Does not bring
+        the app to the foreground unless --foreground is also specified.
+
+    --foreground
+        Bring the app to the foreground. Used with --notify to also
+        focus the window when sending a notification.
 
     --help
         Show this help message.
@@ -228,9 +256,18 @@ def main():
         nargs=2,
         metavar=("NEW_FILE", "OLD_FILE"),
     )
+    mode.add_argument(
+        "--notify",
+        nargs=2,
+        metavar=("TARGET_FILE", "MESSAGE"),
+    )
     parser.add_argument(
         "--annotate",
         metavar="ANNOTATION_FILE",
+    )
+    parser.add_argument(
+        "--foreground",
+        action="store_true",
     )
     parser.add_argument(
         "files",
@@ -259,6 +296,16 @@ def main():
                 break
 
     had_error = False
+
+    if args.notify:
+        target_file, message = args.notify
+        target_file = resolve_path(target_file)
+        app_bin = find_app_binary(target_app)
+        cmd = [app_bin] + dev_entry + [f"--notify={target_file}", message]
+        if args.foreground:
+            cmd.append("--foreground")
+        subprocess.run(cmd)
+        sys.exit(0)
 
     if args.diff or args.diff_by_files:
         if args.diff:

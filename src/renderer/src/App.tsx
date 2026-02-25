@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 import { toast, Toaster } from "sonner";
 import { ContentArea } from "./components/ContentArea";
+import { NotificationDrawer } from "./components/NotificationDrawer";
 import { QuickGoto } from "./components/QuickGoto";
 import { Sidebar } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
-import { TopBar } from "./components/TopBar";
+import { DrawerToggle, TopBar } from "./components/TopBar";
 import {
   DiffContent,
   DiffTopBarContent,
@@ -51,6 +52,7 @@ export default function App(): ReactNode {
   const [groupOrder, setGroupOrder] = useState<string[]>([]);
   const [sidebarWidth, setSidebarWidth] = useState(270);
   const [quickGotoOpen, setQuickGotoOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const mainRef = useRef<HTMLDivElement>(null);
   const configLoaded = useRef(false);
   const recentlyClosed = useRef<OpenEntry[]>([]);
@@ -206,6 +208,10 @@ export default function App(): ReactNode {
     }, 300);
   }, []);
 
+  const toggleDrawer = useCallback(() => {
+    setDrawerOpen((prev) => !prev);
+  }, []);
+
   const handleOpenDialog = useCallback(async () => {
     const files = await mdview.openFileDialog();
     files.forEach((f: FileData) => openFile(f));
@@ -226,6 +232,21 @@ export default function App(): ReactNode {
     },
     [openFile],
   );
+
+  // Load notifications for newly opened tabs
+  const loadedNotificationPaths = useRef(new Set<string>());
+  useEffect(() => {
+    for (const tab of tabs) {
+      if (!loadedNotificationPaths.current.has(tab.path)) {
+        loadedNotificationPaths.current.add(tab.path);
+        mdview.getNotifications(tab.path).then((notifications) => {
+          if (notifications.length > 0) {
+            dispatch({ type: "SET_NOTIFICATIONS", path: tab.path, notifications });
+          }
+        });
+      }
+    }
+  }, [tabs]);
 
   // Persist open tabs whenever the tab list changes
   const tabPaths = tabs.map((t) => t.path).join("\0");
@@ -263,6 +284,14 @@ export default function App(): ReactNode {
       mainRef.current.scrollTop = activeTab.scrollTop;
     }
   }, [activeIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Mark notifications as read when the drawer is open and the active tab has unread notifications
+  useEffect(() => {
+    if (drawerOpen && activeTab && activeTab.unreadNotificationCount > 0) {
+      mdview.markNotificationsRead(activeTab.path);
+      dispatch({ type: "MARK_NOTIFICATIONS_READ", path: activeTab.path });
+    }
+  }, [drawerOpen, activeTab?.path]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist active file to config
   useEffect(() => {
@@ -314,6 +343,9 @@ export default function App(): ReactNode {
           annotationPath: data.annotationPath,
           annotations: data.annotations,
         });
+      }),
+      mdview.onNotificationReceived(({ targetPath, notification }) => {
+        dispatch({ type: "ADD_NOTIFICATION", path: targetPath, notification });
       }),
       mdview.onConfigLoaded(applyConfig),
       mdview.onActivateFile((path: string) => {
@@ -502,7 +534,15 @@ export default function App(): ReactNode {
           onReorderGroup={reorderGroup}
         />
         <div className="flex-1 flex flex-col overflow-hidden">
-          <TopBar>
+          <TopBar
+            right={
+              <DrawerToggle
+                drawerOpen={drawerOpen}
+                unreadNotificationCount={activeTab?.unreadNotificationCount ?? 0}
+                onToggleDrawer={toggleDrawer}
+              />
+            }
+          >
             {activeTab?.kind === "markdown" && (
               <MarkdownTopBarContent
                 scrollRef={mainRef}
@@ -520,25 +560,31 @@ export default function App(): ReactNode {
               />
             )}
           </TopBar>
-          <ContentArea
-            ref={mainRef}
-            activeTab={activeTab}
-            onDrop={handleDrop}
-          >
-            {activeTab?.kind === "markdown" && (
-              <MarkdownContent
-                tab={activeTab}
-                contentWidth={contentWidth}
-                onRetryRemoved={handleRetryRemoved}
-              />
-            )}
-            {activeTab?.kind === "diff" && (
-              <DiffContent
-                tab={activeTab}
-                viewMode={diffViewMode}
-              />
-            )}
-          </ContentArea>
+          <div className="flex-1 flex overflow-hidden">
+            <ContentArea
+              ref={mainRef}
+              activeTab={activeTab}
+              onDrop={handleDrop}
+            >
+              {activeTab?.kind === "markdown" && (
+                <MarkdownContent
+                  tab={activeTab}
+                  contentWidth={contentWidth}
+                  onRetryRemoved={handleRetryRemoved}
+                />
+              )}
+              {activeTab?.kind === "diff" && (
+                <DiffContent
+                  tab={activeTab}
+                  viewMode={diffViewMode}
+                />
+              )}
+            </ContentArea>
+            <NotificationDrawer
+              open={drawerOpen}
+              notifications={activeTab?.notifications ?? []}
+            />
+          </div>
         </div>
       </div>
       <StatusBar
