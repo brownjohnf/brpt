@@ -63,4 +63,5 @@ export interface DiffData {
   secondPath: string;
   oldContent?: string;
   diff: string;
+  mtimeMs: number;
 }

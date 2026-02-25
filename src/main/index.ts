@@ -144,6 +144,7 @@ function handleDiffFileChange(dw: DiffWatch): void {
       secondPath: dw.secondPath,
       oldContent: oldFile.content,
       diff,
+      mtimeMs: newFile.mtimeMs,
     };
     mainWindow.webContents.send("diff-updated", data);
   } else {
@@ -157,6 +158,7 @@ function handleDiffFileChange(dw: DiffWatch): void {
       newContent: newFile.content,
       secondPath: dw.secondPath,
       diff: diffFile.content,
+      mtimeMs: diffFile.mtimeMs,
     };
     mainWindow.webContents.send("diff-updated", data);
   }
@@ -270,6 +272,7 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
           newContent: newFile.content,
           secondPath: diffPath,
           diff: diffFile.content,
+          mtimeMs: diffFile.mtimeMs,
         },
       };
     }
@@ -299,6 +302,7 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
           secondPath: oldPath,
           oldContent: oldFile.content,
           diff,
+          mtimeMs: newFile.mtimeMs,
         },
       };
     }
@@ -381,6 +385,7 @@ function buildDiffData(saved: SavedDiff): DiffData | null {
         oldFile.content,
         newFile.content,
       ),
+      mtimeMs: newFile.mtimeMs,
     };
   } else {
     const diffFile = readFile(secondPath);
@@ -393,6 +398,7 @@ function buildDiffData(saved: SavedDiff): DiffData | null {
       newContent: newFile.content,
       secondPath,
       diff: diffFile.content,
+      mtimeMs: diffFile.mtimeMs,
     };
   }
 }
@@ -683,6 +689,7 @@ ipcMain.handle("request-diff", (_event, newPath: string, diffPath: string) => {
     newContent: newFile.content,
     secondPath: absDiff,
     diff: diffFile.content,
+    mtimeMs: diffFile.mtimeMs,
   };
 
   const dw: DiffWatch = { mode: "diff", newPath: absNew, secondPath: absDiff };
@@ -715,6 +722,7 @@ ipcMain.handle("request-diff-by-files", (_event, newPath: string, oldPath: strin
     secondPath: absOld,
     oldContent: oldFile.content,
     diff,
+    mtimeMs: newFile.mtimeMs,
   };
 
   const dw: DiffWatch = { mode: "diff-by-files", newPath: absNew, secondPath: absOld };

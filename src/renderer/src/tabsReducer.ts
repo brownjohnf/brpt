@@ -71,7 +71,7 @@ export function tabsReducer(state: TabsState, action: TabsAction): TabsState {
         oldContent: data.oldContent,
         diff: data.diff,
         scrollTop: 0,
-        lastModifiedAt: Temporal.Now.instant(),
+        lastModifiedAt: Temporal.Instant.fromEpochMilliseconds(Math.floor(data.mtimeMs)),
         hasUnseenChanges: false,
       };
       const tabs = [...state.tabs, newTab];
@@ -91,7 +91,7 @@ export function tabsReducer(state: TabsState, action: TabsAction): TabsState {
         diff: data.diff,
         newContent: data.newContent,
         oldContent: data.oldContent,
-        lastModifiedAt: Temporal.Now.instant(),
+        lastModifiedAt: Temporal.Instant.fromEpochMilliseconds(Math.floor(data.mtimeMs)),
         hasUnseenChanges: index !== state.activeIndex,
       };
       return { tabs, activeIndex: state.activeIndex };

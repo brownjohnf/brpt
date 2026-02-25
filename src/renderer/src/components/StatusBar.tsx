@@ -8,43 +8,85 @@ interface StatusBarProps {
 
 const RECENCY_THRESHOLD_MS = 30_000;
 
-function formatTime(instant: Temporal.Instant): string {
-  const zoned = instant.toZonedDateTimeISO(Temporal.Now.timeZoneId());
+type TimeDisplayMode = "ago" | "absolute";
+
+function formatAbsolute(instant: Temporal.Instant): string {
+  const tz = Temporal.Now.timeZoneId();
+  const zoned = instant.toZonedDateTimeISO(tz);
+  const today = Temporal.Now.plainDateISO();
   const hour = zoned.hour;
   const minute = zoned.minute;
   const period = hour >= 12 ? "PM" : "AM";
   const displayHour = hour % 12 || 12;
   const displayMinute = String(minute).padStart(2, "0");
-  return `Modified at ${displayHour}:${displayMinute} ${period}`;
-}
+  const time = `${displayHour}:${displayMinute} ${period}`;
 
-function computeRemaining(instant: Temporal.Instant | null): number {
-  if (!instant) {
-    return 0;
+  if (Temporal.PlainDate.compare(zoned.toPlainDate(), today) === 0) {
+    return time;
   }
-  const elapsed = Temporal.Now.instant()
-    .since(instant)
-    .total({ unit: "milliseconds" });
-  return Math.max(0, RECENCY_THRESHOLD_MS - elapsed);
+  const month = zoned.toPlainDate().toLocaleString("en-US", { month: "short" });
+  return `${month} ${zoned.day}, ${zoned.year} at ${time}`;
 }
 
-function useIsRecent(instant: Temporal.Instant | null): boolean {
-  const remaining = computeRemaining(instant);
-  const [expired, setExpired] = useState(false);
+function formatAgo(instant: Temporal.Instant): string {
+  const totalSeconds = Math.max(
+    0,
+    Math.floor(Temporal.Now.instant().since(instant).total({ unit: "seconds" })),
+  );
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (days > 0) {
+    return `${days} days, ${hours} hours ago`;
+  }
+  if (hours > 0) {
+    return `${hours} hours, ${minutes} min ago`;
+  }
+  if (minutes > 0) {
+    return `${minutes} min, ${seconds} sec ago`;
+  }
+  return `${seconds} sec ago`;
+}
+
+function ModifiedTime({ instant }: { instant: Temporal.Instant }): ReactNode {
+  const [mode, setMode] = useState<TimeDisplayMode>("ago");
+  const [, setTick] = useState(0);
+
+  const elapsedMs = Temporal.Now.instant().since(instant).total({ unit: "milliseconds" });
+  const isRecent = elapsedMs < RECENCY_THRESHOLD_MS;
 
   useEffect(() => {
-    const r = computeRemaining(instant);
-    if (r <= 0) {
+    if (mode !== "ago") {
       return;
     }
-    const timer = setTimeout(() => setExpired(true), r);
-    return () => {
-      clearTimeout(timer);
-      setExpired(false);
-    };
-  }, [instant]);
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [mode, instant]);
 
-  return remaining > 0 && !expired;
+  const text = mode === "ago" ? formatAgo(instant) : formatAbsolute(instant);
+
+  return (
+    <span
+      className="ml-auto shrink-0 flex items-center gap-1 transition-colors duration-500"
+      style={{ color: isRecent ? "var(--status-glow)" : undefined }}
+    >
+      <span className="select-text">{text}</span>
+      <button
+        className="opacity-40 hover:opacity-100 hover:text-[var(--status-glow)] transition-all cursor-pointer"
+        onClick={() => setMode((m) => (m === "ago" ? "absolute" : "ago"))}
+        title={mode === "ago" ? "Show time" : "Show elapsed"}
+      >
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 1L0.5 3L3 5" />
+          <line x1="0.5" y1="3" x2="9.5" y2="3" />
+          <path d="M7 5L9.5 7L7 9" />
+          <line x1="9.5" y1="7" x2="0.5" y2="7" />
+        </svg>
+      </button>
+    </span>
+  );
 }
 
 function ClipboardIcon(): ReactNode {
@@ -88,8 +130,6 @@ export function StatusBar({
   lastModifiedAt,
   draggablePath,
 }: StatusBarProps): ReactNode {
-  const isRecent = useIsRecent(lastModifiedAt);
-
   const handleDragStart = useCallback(
     (e: React.DragEvent) => {
       if (draggablePath) {
@@ -132,16 +172,13 @@ export function StatusBar({
           </span>
         </span>
       )}
-      {lastModifiedAt && (
-        <span
-          className="ml-auto shrink-0 transition-colors duration-500"
-          style={{
-            color: isRecent ? "var(--status-glow)" : undefined,
-          }}
-        >
-          {formatTime(lastModifiedAt)}
-        </span>
-      )}
+      {lastModifiedAt && <ModifiedTime instant={lastModifiedAt} />}
+      <span className="shrink-0 opacity-20 ml-1">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2">
+          <path d="M2 10L10 2" />
+          <path d="M6 10L10 6" />
+        </svg>
+      </span>
     </div>
   );
 }
