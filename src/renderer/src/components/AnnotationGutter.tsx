@@ -63,7 +63,21 @@ export function AnnotationGutter({
 
   useLayoutEffect(() => {
     measure();
-  }, [measure, contentKey, annotations, collapsedInsertionLines]);
+  }, [measure, contentKey, annotations]);
+
+  useLayoutEffect(() => {
+    measure();
+    const start = performance.now();
+    let raf: number;
+    function tick() {
+      measure();
+      if (performance.now() - start < 250) {
+        raf = requestAnimationFrame(tick);
+      }
+    }
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [measure, collapsedInsertionLines]);
 
   useEffect(() => {
     if (!contentEl) {
