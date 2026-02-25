@@ -14,6 +14,7 @@ interface SidebarProps {
   containerFolders: string[];
   groupOrder: string[];
   width: number;
+  open: boolean;
   onActivateTab: (index: number) => void;
   onCloseTab: (index: number) => void;
   onOpenDialog: () => void;
@@ -140,6 +141,7 @@ export function Sidebar({
   containerFolders,
   groupOrder,
   width,
+  open,
   onActivateTab,
   onCloseTab,
   onOpenDialog,
@@ -151,6 +153,7 @@ export function Sidebar({
 }: SidebarProps): ReactNode {
   const [dragOver, setDragOver] = useState(false);
   const dragging = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const { grouped, ungrouped } = useMemo(
     () => groupTabs(tabs, projects, containerFolders, groupOrder),
@@ -195,6 +198,9 @@ export function Sidebar({
     (e: React.MouseEvent) => {
       e.preventDefault();
       dragging.current = true;
+      if (containerRef.current) {
+        containerRef.current.style.transition = "none";
+      }
       const startX = e.clientX;
       const startWidth = width;
 
@@ -211,6 +217,9 @@ export function Sidebar({
 
       function onMouseUp(): void {
         dragging.current = false;
+        if (containerRef.current) {
+          containerRef.current.style.transition = "";
+        }
         document.removeEventListener("mousemove", onMouseMove);
         document.removeEventListener("mouseup", onMouseUp);
         document.body.style.cursor = "";
@@ -226,13 +235,14 @@ export function Sidebar({
   );
 
   return (
-    <div className="flex" style={{ width }}>
+    <div ref={containerRef} className="flex shrink-0 overflow-hidden" style={{ width: open ? width : 0, transition: "width 150ms ease" }}>
       <div
         className={classNames(
           "flex-1 flex flex-col overflow-hidden",
           "bg-[var(--sidebar-bg)]",
           dragOver && "bg-[var(--tab-hover-bg)]"
         )}
+        style={{ minWidth: MIN_WIDTH }}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}

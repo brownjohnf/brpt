@@ -2,20 +2,57 @@ import type { ReactNode } from "react";
 
 interface TopBarProps {
   children?: ReactNode;
+  left?: ReactNode;
   right?: ReactNode;
 }
 
-export function TopBar({ children, right }: TopBarProps): ReactNode {
+export function TopBar({ children, left, right }: TopBarProps): ReactNode {
   return (
     <div
       className="flex items-center justify-between gap-2 px-4 py-1 shrink-0 border-b border-[var(--sidebar-border)]"
       style={{ background: "var(--sidebar-bg)" }}
     >
+      {left}
       <div className="flex items-center justify-between gap-2 flex-1 min-w-0">
         {children}
       </div>
       {right}
     </div>
+  );
+}
+
+function SidebarIcon(): ReactNode {
+  return (
+    <svg
+      width="14"
+      height="12"
+      viewBox="0 0 14 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="1" y="1" width="12" height="10" rx="1.5" />
+      <line x1="5" y1="1" x2="5" y2="11" />
+    </svg>
+  );
+}
+
+interface SidebarToggleProps {
+  sidebarOpen: boolean;
+  onToggleSidebar: () => void;
+}
+
+export function SidebarToggle({ sidebarOpen, onToggleSidebar }: SidebarToggleProps): ReactNode {
+  return (
+    <button
+      className={`shrink-0 cursor-pointer transition-opacity ${sidebarOpen ? "opacity-100" : "opacity-40 hover:opacity-100"}`}
+      onClick={onToggleSidebar}
+      title="Toggle sidebar"
+    >
+      <SidebarIcon />
+    </button>
   );
 }
 

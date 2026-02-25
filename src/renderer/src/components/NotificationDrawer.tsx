@@ -69,6 +69,9 @@ export function NotificationDrawer({ notifications, open, width, onResize }: Not
     (e: React.MouseEvent) => {
       e.preventDefault();
       dragging.current = true;
+      if (containerRef.current) {
+        containerRef.current.style.transition = "none";
+      }
       const startX = e.clientX;
       const startWidth = width;
       const containerWidth = containerRef.current?.parentElement?.clientWidth ?? Infinity;
@@ -87,6 +90,9 @@ export function NotificationDrawer({ notifications, open, width, onResize }: Not
 
       function onMouseUp(): void {
         dragging.current = false;
+        if (containerRef.current) {
+          containerRef.current.style.transition = "";
+        }
         document.removeEventListener("mousemove", onMouseMove);
         document.removeEventListener("mouseup", onMouseUp);
         document.body.style.cursor = "";
@@ -102,7 +108,7 @@ export function NotificationDrawer({ notifications, open, width, onResize }: Not
   );
 
   return (
-    <div ref={containerRef} className="flex shrink-0 overflow-hidden" style={{ width: open ? width : 0 }}>
+    <div ref={containerRef} className="flex shrink-0 overflow-hidden" style={{ width: open ? width : 0, transition: "width 150ms ease" }}>
       <div
         className={classNames(
           "w-1 cursor-col-resize shrink-0 bg-[var(--sidebar-bg)]",

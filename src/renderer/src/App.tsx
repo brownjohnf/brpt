@@ -5,7 +5,7 @@ import { DEFAULT_DRAWER_WIDTH, NotificationDrawer } from "./components/Notificat
 import { QuickGoto } from "./components/QuickGoto";
 import { Sidebar } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
-import { DrawerToggle, TopBar } from "./components/TopBar";
+import { DrawerToggle, SidebarToggle, TopBar } from "./components/TopBar";
 import {
   DiffContent,
   DiffTopBarContent,
@@ -52,6 +52,7 @@ export default function App(): ReactNode {
   const [groupOrder, setGroupOrder] = useState<string[]>([]);
   const [sidebarWidth, setSidebarWidth] = useState(270);
   const [quickGotoOpen, setQuickGotoOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerWidth, setDrawerWidth] = useState(DEFAULT_DRAWER_WIDTH);
   const mainRef = useRef<HTMLDivElement>(null);
@@ -218,6 +219,10 @@ export default function App(): ReactNode {
     drawerSaveTimer.current = setTimeout(() => {
       mdview.setConfig("drawerWidth", width);
     }, 300);
+  }, []);
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarOpen((prev) => !prev);
   }, []);
 
   const toggleDrawer = useCallback(() => {
@@ -537,6 +542,7 @@ export default function App(): ReactNode {
           containerFolders={containerFolders}
           groupOrder={groupOrder}
           width={sidebarWidth}
+          open={sidebarOpen}
           onActivateTab={activateTab}
           onCloseTab={closeTab}
           onOpenDialog={handleOpenDialog}
@@ -548,6 +554,12 @@ export default function App(): ReactNode {
         />
         <div className="flex-1 flex flex-col overflow-hidden">
           <TopBar
+            left={
+              <SidebarToggle
+                sidebarOpen={sidebarOpen}
+                onToggleSidebar={toggleSidebar}
+              />
+            }
             right={
               <DrawerToggle
                 drawerOpen={drawerOpen}
