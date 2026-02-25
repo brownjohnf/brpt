@@ -1,9 +1,15 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, type ReactNode } from "react";
+import { classNames } from "../classNames";
 import type { BrptNotification } from "../types";
+
+const MIN_WIDTH = 200;
+const DEFAULT_WIDTH = 360;
 
 interface NotificationDrawerProps {
   notifications: BrptNotification[];
   open: boolean;
+  width: number;
+  onResize: (width: number) => void;
 }
 
 function formatTimestamp(iso: string): string {
@@ -50,22 +56,67 @@ function NotificationItem({ notification }: { notification: BrptNotification }):
   );
 }
 
-const DRAWER_WIDTH = 360;
+export { DEFAULT_WIDTH as DEFAULT_DRAWER_WIDTH };
 
-export function NotificationDrawer({ notifications, open }: NotificationDrawerProps): ReactNode {
+const VIEWER_MIN_WIDTH = 400;
+
+export function NotificationDrawer({ notifications, open, width, onResize }: NotificationDrawerProps): ReactNode {
   const reversed = [...notifications].reverse();
+  const dragging = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      dragging.current = true;
+      const startX = e.clientX;
+      const startWidth = width;
+      const containerWidth = containerRef.current?.parentElement?.clientWidth ?? Infinity;
+      const maxWidth = containerWidth - VIEWER_MIN_WIDTH;
+
+      function onMouseMove(e: MouseEvent): void {
+        if (!dragging.current) {
+          return;
+        }
+        const newWidth = Math.min(
+          maxWidth,
+          Math.max(MIN_WIDTH, startWidth - (e.clientX - startX))
+        );
+        onResize(newWidth);
+      }
+
+      function onMouseUp(): void {
+        dragging.current = false;
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      }
+
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+    },
+    [width, onResize]
+  );
 
   return (
-    <div
-      className="shrink-0 overflow-hidden transition-[width] duration-100 ease-in-out"
-      style={{ width: open ? DRAWER_WIDTH : 0 }}
-    >
+    <div ref={containerRef} className="flex shrink-0 overflow-hidden" style={{ width: open ? width : 0 }}>
       <div
-        className="flex flex-col border-l h-full overflow-hidden"
+        className={classNames(
+          "w-1 cursor-col-resize shrink-0 bg-[var(--sidebar-bg)]",
+          "border-x border-[var(--sidebar-border)]",
+          "hover:bg-[var(--tab-hover-bg)]",
+          "active:bg-[var(--tab-hover-bg)]"
+        )}
+        onMouseDown={handleResizeStart}
+      />
+      <div
+        className="flex-1 flex flex-col h-full overflow-hidden"
         style={{
-          width: DRAWER_WIDTH,
+          minWidth: MIN_WIDTH,
           background: "var(--sidebar-bg)",
-          borderColor: "var(--sidebar-border)",
         }}
       >
         <div

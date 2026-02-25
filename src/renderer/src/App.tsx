@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 import { toast, Toaster } from "sonner";
 import { ContentArea } from "./components/ContentArea";
-import { NotificationDrawer } from "./components/NotificationDrawer";
+import { DEFAULT_DRAWER_WIDTH, NotificationDrawer } from "./components/NotificationDrawer";
 import { QuickGoto } from "./components/QuickGoto";
 import { Sidebar } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
@@ -53,6 +53,7 @@ export default function App(): ReactNode {
   const [sidebarWidth, setSidebarWidth] = useState(270);
   const [quickGotoOpen, setQuickGotoOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerWidth, setDrawerWidth] = useState(DEFAULT_DRAWER_WIDTH);
   const mainRef = useRef<HTMLDivElement>(null);
   const configLoaded = useRef(false);
   const recentlyClosed = useRef<OpenEntry[]>([]);
@@ -208,6 +209,17 @@ export default function App(): ReactNode {
     }, 300);
   }, []);
 
+  const drawerSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleDrawerResize = useCallback((width: number) => {
+    setDrawerWidth(width);
+    if (drawerSaveTimer.current) {
+      clearTimeout(drawerSaveTimer.current);
+    }
+    drawerSaveTimer.current = setTimeout(() => {
+      mdview.setConfig("drawerWidth", width);
+    }, 300);
+  }, []);
+
   const toggleDrawer = useCallback(() => {
     setDrawerOpen((prev) => !prev);
   }, []);
@@ -308,6 +320,7 @@ export default function App(): ReactNode {
     if (config.groupOrder) { setGroupOrder(config.groupOrder); }
     if (config.contentWidth) { setContentWidth((prev) => ({ ...prev, ...config.contentWidth })); }
     if (config.sidebarWidth != null) { setSidebarWidth(config.sidebarWidth); }
+    if ((config as Record<string, unknown>).drawerWidth != null) { setDrawerWidth((config as Record<string, unknown>).drawerWidth as number); }
   }, []);
 
   // IPC listeners
@@ -582,6 +595,8 @@ export default function App(): ReactNode {
             </ContentArea>
             <NotificationDrawer
               open={drawerOpen}
+              width={drawerWidth}
+              onResize={handleDrawerResize}
               notifications={activeTab?.notifications ?? []}
             />
           </div>
