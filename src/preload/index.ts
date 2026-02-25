@@ -29,6 +29,32 @@ export interface MdviewApi {
   homedir: string;
 }
 
+/**
+ * Blockquote inner tokens have `raw` values stripped of `> ` prefixes,
+ * so counting newlines in `raw` doesn't give source line offsets.
+ * Instead, locate each token's text within the blockquote's `text`
+ * property (which preserves line structure) to compute line offsets.
+ */
+function assignBlockquoteLineNumbers(bqToken: Tokens.Blockquote, startLine: number): void {
+  let searchOffset = 0;
+  for (const token of bqToken.tokens) {
+    const pos = bqToken.text.indexOf(token.raw, searchOffset);
+    const lineOffset = pos >= 0
+      ? bqToken.text.substring(0, pos).split("\n").length - 1
+      : 0;
+    const tokenLine = startLine + lineOffset;
+    (token as Record<string, unknown>)._line = tokenLine;
+
+    if (token.type === "blockquote") {
+      assignBlockquoteLineNumbers(token as Tokens.Blockquote, tokenLine);
+    }
+
+    if (pos >= 0) {
+      searchOffset = pos + token.raw.length;
+    }
+  }
+}
+
 /** Assign `_line` to tokens based on cumulative newlines in `raw`. */
 function assignLineNumbers(tokens: Token[], startLine: number = 1): void {
   let line = startLine;
@@ -46,7 +72,7 @@ function assignLineNumbers(tokens: Token[], startLine: number = 1): void {
 
     if (token.type === "blockquote") {
       const bqToken = token as Tokens.Blockquote;
-      assignLineNumbers(bqToken.tokens);
+      assignBlockquoteLineNumbers(bqToken, line);
     }
 
     if (token.type === "table") {
