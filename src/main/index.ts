@@ -471,6 +471,8 @@ function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: useSaved ? saved.width : 1000,
     height: useSaved ? saved.height : 700,
+    minWidth: 480,
+    minHeight: 300,
     ...(useSaved ? { x: saved.x, y: saved.y } : {}),
     title: "Brett's Rad Preview Tool",
     webPreferences: {
