@@ -40,10 +40,15 @@ export interface OpenFileEntry {
 
 export type OpenEntry = string | OpenFileEntry;
 
+export type ProjectEntry = string | { path: string; alias?: string };
+
 export interface AppConfig {
   theme: "light" | "dark";
   openFiles: OpenEntry[];
   containerFolders: string[];
+  projects?: ProjectEntry[];
+  activeFile?: string;
+  groupOrder?: string[];
   contentWidth: ContentWidthConfig;
   brpt_development_roots?: string[];
   windowBounds?: WindowBounds;

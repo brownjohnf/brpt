@@ -1,4 +1,5 @@
 import { homedir } from "./platform";
+import type { ProjectEntry } from "../../shared/types";
 import type { Tab } from "./types";
 
 export interface TabGroup {
@@ -14,10 +15,21 @@ function expandPath(p: string): string {
   return p;
 }
 
-export function getTabGroup(
+function getTabGroup(
   filePath: string,
-  containerFolders: string[]
+  projects: ProjectEntry[],
+  containerFolders: string[],
 ): { name: string; rootPath: string } | null {
+  for (const entry of projects) {
+    const path = typeof entry === "string" ? entry : entry.path;
+    const alias = typeof entry === "string" ? undefined : entry.alias;
+    const expanded = expandPath(path).replace(/\/$/, "");
+    if (filePath.startsWith(expanded + "/")) {
+      const name = alias ?? expanded.split("/").pop()!;
+      return { name, rootPath: expanded };
+    }
+  }
+
   for (const folder of containerFolders) {
     const expanded = expandPath(folder).replace(/\/$/, "");
     if (filePath.startsWith(expanded + "/")) {
@@ -28,18 +40,21 @@ export function getTabGroup(
       }
     }
   }
+
   return null;
 }
 
 export function groupTabs(
   tabs: Tab[],
-  containerFolders: string[]
+  projects: ProjectEntry[],
+  containerFolders: string[],
+  groupOrder?: string[],
 ): { grouped: TabGroup[]; ungrouped: { tab: Tab; index: number }[] } {
   const groups = new Map<string, TabGroup>();
   const ungrouped: { tab: Tab; index: number }[] = [];
 
   tabs.forEach((tab, index) => {
-    const group = getTabGroup(tab.path, containerFolders);
+    const group = getTabGroup(tab.path, projects, containerFolders);
     if (group) {
       if (!groups.has(group.name)) {
         groups.set(group.name, {
@@ -54,9 +69,14 @@ export function groupTabs(
     }
   });
 
-  const grouped: TabGroup[] = Array.from(groups.values()).sort((a, b) =>
-    a.name.localeCompare(b.name)
-  );
+  const grouped: TabGroup[] = Array.from(groups.values()).sort((a, b) => {
+    const ai = groupOrder ? groupOrder.indexOf(a.name) : -1;
+    const bi = groupOrder ? groupOrder.indexOf(b.name) : -1;
+    if (ai !== -1 && bi !== -1) { return ai - bi; }
+    if (ai !== -1) { return -1; }
+    if (bi !== -1) { return 1; }
+    return a.name.localeCompare(b.name);
+  });
 
   return { grouped, ungrouped };
 }

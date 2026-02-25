@@ -14,7 +14,8 @@ export type TabsAction =
   | { type: "REORDER_TAB"; fromIndex: number; toIndex: number }
   | { type: "OPEN_DIFF"; data: DiffData }
   | { type: "DIFF_UPDATED"; data: DiffData }
-  | { type: "SET_ANNOTATIONS"; targetPath: string; annotationPath: string; annotations: Annotation[] };
+  | { type: "SET_ANNOTATIONS"; targetPath: string; annotationPath: string; annotations: Annotation[] }
+  | { type: "ACTIVATE_FILE_BY_PATH"; path: string };
 
 export const initialTabsState: TabsState = {
   tabs: [],
@@ -200,6 +201,14 @@ export function tabsReducer(state: TabsState, action: TabsAction): TabsState {
         annotations: action.annotations,
       };
       return { tabs, activeIndex: state.activeIndex };
+    }
+
+    case "ACTIVATE_FILE_BY_PATH": {
+      const index = state.tabs.findIndex((t) => t.path === action.path);
+      if (index === -1 || index === state.activeIndex) {
+        return state;
+      }
+      return { tabs: state.tabs, activeIndex: index };
     }
   }
 }

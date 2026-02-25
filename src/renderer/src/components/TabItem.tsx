@@ -129,8 +129,8 @@ export function TabItem({
       )}
       style={{
         color: textColor,
-        borderTop: dropPosition === "above" ? "2px solid var(--tab-changed-dot)" : undefined,
-        borderBottom: dropPosition === "below" ? "2px solid var(--tab-changed-dot)" : undefined,
+        borderTop: `2px solid ${dropPosition === "above" ? "var(--tab-changed-dot)" : "transparent"}`,
+        borderBottom: `2px solid ${dropPosition === "below" ? "var(--tab-changed-dot)" : "transparent"}`,
       }}
       onClick={onClick}
     >

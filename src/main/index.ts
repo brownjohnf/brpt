@@ -534,6 +534,11 @@ function createWindow(): void {
     // Always restore the session
     restoreSessionEntries(sessionEntries);
 
+    // Restore the previously active tab
+    if (config.activeFile) {
+      mainWindow.webContents.send("activate-file", config.activeFile);
+    }
+
     // CLI args open on top of the session
     if (cliFiles.length > 0) {
       openFilesAndSend(cliFiles);

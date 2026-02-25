@@ -1,13 +1,18 @@
 import { useCallback, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
+import type { ProjectEntry } from "../../../shared/types";
 import { classNames } from "../classNames";
 import { groupTabs } from "../groupTabs";
 import type { Tab } from "../types";
 import { TabItem } from "./TabItem";
 
+const GROUP_MIME = "application/x-brpt-tab-group";
+
 interface SidebarProps {
   tabs: Tab[];
   activeIndex: number;
+  projects: ProjectEntry[];
   containerFolders: string[];
+  groupOrder: string[];
   width: number;
   onActivateTab: (index: number) => void;
   onCloseTab: (index: number) => void;
@@ -16,15 +21,124 @@ interface SidebarProps {
   onDrop: (e: React.DragEvent) => void;
   onResize: (width: number) => void;
   onReorderTab: (fromIndex: number, toIndex: number) => void;
+  onReorderGroup: (fromName: string, toName: string) => void;
 }
 
 const MIN_WIDTH = 120;
 const MAX_WIDTH = 400;
 
+type GroupDropPosition = "above" | "below" | null;
+
+function GroupContainer({
+  name,
+  isCollapsed,
+  onToggle,
+  onReorderGroup,
+  children,
+}: {
+  name: string;
+  isCollapsed: boolean;
+  onToggle: () => void;
+  onReorderGroup: (fromName: string, toName: string) => void;
+  children: ReactNode;
+}): ReactNode {
+  const [dropPosition, setDropPosition] = useState<GroupDropPosition>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleDragStart = useCallback(
+    (e: React.DragEvent) => {
+      e.dataTransfer.setData(GROUP_MIME, name);
+      e.dataTransfer.effectAllowed = "move";
+    },
+    [name],
+  );
+
+  const handleDragOver = useCallback(
+    (e: React.DragEvent) => {
+      if (!e.dataTransfer.types.includes(GROUP_MIME)) {
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = "move";
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        setDropPosition(e.clientY < midY ? "above" : "below");
+      }
+    },
+    [],
+  );
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    if (containerRef.current && !containerRef.current.contains(e.relatedTarget as Node)) {
+      setDropPosition(null);
+    }
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.stopPropagation();
+      setDropPosition(null);
+      const fromName = e.dataTransfer.getData(GROUP_MIME);
+      if (!fromName || fromName === name) {
+        return;
+      }
+      onReorderGroup(fromName, name);
+    },
+    [name, onReorderGroup],
+  );
+
+  const handleDragEnd = useCallback(() => {
+    setDropPosition(null);
+  }, []);
+
+  return (
+    <div
+      ref={containerRef}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      onDragEnd={handleDragEnd}
+      style={{
+        borderTop: `2px solid ${dropPosition === "above" ? "var(--tab-changed-dot)" : "transparent"}`,
+        borderBottom: `2px solid ${dropPosition === "below" ? "var(--tab-changed-dot)" : "transparent"}`,
+      }}
+    >
+      <button
+        type="button"
+        draggable
+        onClick={onToggle}
+        onDragStart={handleDragStart}
+        className={classNames(
+          "w-full flex items-baseline gap-1 text-left",
+          "px-2 py-1 mt-1 mb-0.5 text-[11px] font-semibold tracking-wide",
+          "text-[var(--tab-text)] opacity-60",
+          "bg-transparent border-none cursor-pointer",
+          "hover:opacity-100"
+        )}
+      >
+        <span
+          className="text-[9px] inline-block transition-transform"
+          style={{
+            transform: isCollapsed ? "rotate(-90deg)" : "rotate(0deg)",
+          }}
+        >
+          ▼
+        </span>
+        {name}
+      </button>
+      {children}
+    </div>
+  );
+}
+
 export function Sidebar({
   tabs,
   activeIndex,
+  projects,
   containerFolders,
+  groupOrder,
   width,
   onActivateTab,
   onCloseTab,
@@ -33,13 +147,14 @@ export function Sidebar({
   onDrop,
   onResize,
   onReorderTab,
+  onReorderGroup,
 }: SidebarProps): ReactNode {
   const [dragOver, setDragOver] = useState(false);
   const dragging = useRef(false);
 
   const { grouped, ungrouped } = useMemo(
-    () => groupTabs(tabs, containerFolders),
-    [tabs, containerFolders]
+    () => groupTabs(tabs, projects, containerFolders, groupOrder),
+    [tabs, projects, containerFolders, groupOrder]
   );
 
   const [collapsed, toggleCollapsed] = useReducer(
@@ -51,6 +166,12 @@ export function Sidebar({
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
+    if (
+      e.dataTransfer.types.includes("application/x-brpt-tab") ||
+      e.dataTransfer.types.includes(GROUP_MIME)
+    ) {
+      return;
+    }
     e.preventDefault();
     if (e.dataTransfer) {
       e.dataTransfer.dropEffect = "copy";
@@ -118,30 +239,13 @@ export function Sidebar({
       >
         <div className="flex-1 overflow-y-auto p-2">
           {grouped.map((group) => (
-            <div key={group.name}>
-              <button
-                type="button"
-                onClick={() => toggleCollapsed(group.name)}
-                className={classNames(
-                  "w-full flex items-baseline gap-1 text-left",
-                  "px-2 py-1 mt-1 mb-0.5 text-[11px] font-semibold tracking-wide",
-                  "text-[var(--tab-text)] opacity-60",
-                  "bg-transparent border-none cursor-pointer",
-                  "hover:opacity-100"
-                )}
-              >
-                <span
-                  className="text-[9px] inline-block transition-transform"
-                  style={{
-                    transform: collapsed[group.name]
-                      ? "rotate(-90deg)"
-                      : "rotate(0deg)",
-                  }}
-                >
-                  ▼
-                </span>
-                {group.name}
-              </button>
+            <GroupContainer
+              key={group.name}
+              name={group.name}
+              isCollapsed={!!collapsed[group.name]}
+              onToggle={() => toggleCollapsed(group.name)}
+              onReorderGroup={onReorderGroup}
+            >
               {!collapsed[group.name] &&
                 group.tabs.map(({ tab, index }) => (
                   <TabItem
@@ -155,7 +259,7 @@ export function Sidebar({
                     onReorderTab={onReorderTab}
                   />
                 ))}
-            </div>
+            </GroupContainer>
           ))}
           {ungrouped.length > 0 && (
             <div>

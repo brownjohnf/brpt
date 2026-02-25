@@ -11,6 +11,7 @@ export type {
   FileData,
   OpenEntry,
   OpenFileEntry,
+  ProjectEntry,
   SavedDiff,
 } from "../../shared/types";
 

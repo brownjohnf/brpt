@@ -27,6 +27,7 @@ import type {
   FileData,
   OpenEntry,
   OpenFileEntry,
+  ProjectEntry,
   SavedDiff,
 } from "./types";
 import { groupTabs } from "./groupTabs";
@@ -41,11 +42,13 @@ export default function App(): ReactNode {
   );
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [containerFolders, setContainerFolders] = useState<string[]>([]);
+  const [projects, setProjects] = useState<ProjectEntry[]>([]);
   const [contentWidth, setContentWidth] = useState<ContentWidthConfig>({
     mode: "fixed",
     fixedWidth: "880px",
     cappedWidth: "1200px",
   });
+  const [groupOrder, setGroupOrder] = useState<string[]>([]);
   const [sidebarWidth, setSidebarWidth] = useState(270);
   const [quickGotoOpen, setQuickGotoOpen] = useState(false);
   const mainRef = useRef<HTMLDivElement>(null);
@@ -154,6 +157,44 @@ export default function App(): ReactNode {
     [],
   );
 
+  const reorderGroup = useCallback(
+    (fromName: string, toName: string) => {
+      setGroupOrder((prev) => {
+        // Build the full order: start with prev, append any groups not yet listed
+        const allGroupNames = groupTabs(tabs, projects, containerFolders, prev)
+          .grouped.map((g) => g.name);
+        const full = [...prev];
+        for (const name of allGroupNames) {
+          if (!full.includes(name)) {
+            full.push(name);
+          }
+        }
+
+        const fromIdx = full.indexOf(fromName);
+        const toIdx = full.indexOf(toName);
+        if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) {
+          return prev;
+        }
+
+        const next = [...full];
+        const [moved] = next.splice(fromIdx, 1);
+        next.splice(toIdx, 0, moved);
+
+        // Cap at 50, pruning stale entries from the tail
+        const activeNames = new Set(allGroupNames);
+        while (next.length > 50) {
+          const staleIdx = next.findLastIndex((n) => !activeNames.has(n));
+          if (staleIdx === -1) { break; }
+          next.splice(staleIdx, 1);
+        }
+
+        mdview.setConfig("groupOrder", next);
+        return next;
+      });
+    },
+    [tabs, projects, containerFolders],
+  );
+
   const sidebarSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleSidebarResize = useCallback((width: number) => {
     setSidebarWidth(width);
@@ -223,10 +264,19 @@ export default function App(): ReactNode {
     }
   }, [activeIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Persist active file to config
+  useEffect(() => {
+    if (configLoaded.current && activeTab) {
+      mdview.setConfig("activeFile", activeTab.path);
+    }
+  }, [activeTab?.path]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const applyConfig = useCallback((config: AppConfig) => {
     configLoaded.current = true;
     if (config.theme) { setTheme(config.theme); }
     if (config.containerFolders) { setContainerFolders(config.containerFolders); }
+    if (config.projects) { setProjects(config.projects); }
+    if (config.groupOrder) { setGroupOrder(config.groupOrder); }
     if (config.contentWidth) { setContentWidth((prev) => ({ ...prev, ...config.contentWidth })); }
     if (config.sidebarWidth != null) { setSidebarWidth(config.sidebarWidth); }
   }, []);
@@ -266,6 +316,9 @@ export default function App(): ReactNode {
         });
       }),
       mdview.onConfigLoaded(applyConfig),
+      mdview.onActivateFile((path: string) => {
+        dispatch({ type: "ACTIVATE_FILE_BY_PATH", path });
+      }),
     ];
     return () => unsubs.forEach((fn) => fn());
   }, [openFile, openDiff, applyConfig]);
@@ -277,7 +330,7 @@ export default function App(): ReactNode {
   // Keyboard shortcuts
   useEffect(() => {
     function* iterateVisualTabs(): Generator<number> {
-      const { grouped, ungrouped } = groupTabs(tabs, containerFolders);
+      const { grouped, ungrouped } = groupTabs(tabs, projects, containerFolders, groupOrder);
       for (const group of grouped) {
         for (const { index } of group.tabs) {
           yield index;
@@ -417,7 +470,7 @@ export default function App(): ReactNode {
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [activeIndex, tabs, containerFolders, closeTab, handleOpenDialog, activateTab, openFile]);
+  }, [activeIndex, tabs, projects, containerFolders, groupOrder, closeTab, handleOpenDialog, activateTab, openFile]);
 
   // Apply theme to document and toggle stylesheets
   useThemeStyles(theme);
@@ -435,7 +488,9 @@ export default function App(): ReactNode {
         <Sidebar
           tabs={tabs}
           activeIndex={activeIndex}
+          projects={projects}
           containerFolders={containerFolders}
+          groupOrder={groupOrder}
           width={sidebarWidth}
           onActivateTab={activateTab}
           onCloseTab={closeTab}
@@ -444,6 +499,7 @@ export default function App(): ReactNode {
           onDrop={handleDrop}
           onResize={handleSidebarResize}
           onReorderTab={reorderTab}
+          onReorderGroup={reorderGroup}
         />
         <div className="flex-1 flex flex-col overflow-hidden">
           <TopBar>

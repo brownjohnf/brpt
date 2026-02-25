@@ -16,6 +16,7 @@ export interface MdviewApi {
   onAnnotationsFromArgs(callback: (data: AnnotationData) => void): () => void;
   onAnnotationsUpdated(callback: (data: AnnotationData) => void): () => void;
   onConfigLoaded(callback: (config: AppConfig) => void): () => void;
+  onActivateFile(callback: (path: string) => void): () => void;
   openFileDialog(): Promise<FileData[]>;
   requestFile(filePath: string): Promise<FileData | null>;
   requestDiff(newPath: string, diffPath: string): Promise<DiffData | null>;
@@ -315,6 +316,14 @@ const api: MdviewApi = {
     ipcRenderer.send("set-config", key, value),
   saveOpenFiles: (entries: OpenEntry[]) =>
     ipcRenderer.send("save-open-files", entries),
+  onActivateFile: (callback: (path: string) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, path: string): void =>
+      callback(path);
+    ipcRenderer.on("activate-file", listener);
+    return () => {
+      ipcRenderer.removeListener("activate-file", listener);
+    };
+  },
   startFileDrag: (filePath: string) =>
     ipcRenderer.send("start-file-drag", filePath),
   homedir: os.homedir(),
