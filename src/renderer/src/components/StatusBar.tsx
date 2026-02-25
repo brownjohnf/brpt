@@ -47,6 +47,24 @@ function useIsRecent(instant: Temporal.Instant | null): boolean {
   return remaining > 0 && !expired;
 }
 
+function ClipboardIcon(): ReactNode {
+  return (
+    <svg
+      width="10"
+      height="12"
+      viewBox="0 0 10 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="2.5" y="2.5" width="6.5" height="8.5" rx="1" />
+      <path d="M7 2.5V2a1 1 0 0 0-1-1H2a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h.5" />
+    </svg>
+  );
+}
+
 function FileIcon(): ReactNode {
   return (
     <svg
@@ -100,9 +118,20 @@ export function StatusBar({
           <FileIcon />
         </span>
       )}
-      <span className="overflow-hidden text-ellipsis whitespace-nowrap">
-        {path ? `Watching: ${path}` : ""}
-      </span>
+      {path && (
+        <span
+          className="group/copy flex items-center gap-1.5 overflow-hidden cursor-pointer hover:text-[var(--tab-active-text)] transition-colors"
+          onClick={() => navigator.clipboard.writeText(path)}
+          title="Copy path"
+        >
+          <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+            Watching: {path}
+          </span>
+          <span className="shrink-0 opacity-40 group-hover/copy:opacity-100 group-hover/copy:text-[var(--status-glow)] transition-all">
+            <ClipboardIcon />
+          </span>
+        </span>
+      )}
       {lastModifiedAt && (
         <span
           className="ml-auto shrink-0 transition-colors duration-500"
