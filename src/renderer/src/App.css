@@ -32,6 +32,7 @@ body[data-theme="light"] {
   --seg-active-bg: #eaeef2;
   --seg-active-text: #24292f;
   --tab-changed-dot: #0969da;
+  --annotation-marker: #bf8700;
   --status-glow: #0969da;
 }
 
@@ -57,6 +58,7 @@ body[data-theme="dark"] {
   --seg-active-bg: #30363d;
   --seg-active-text: #e6edf3;
   --tab-changed-dot: #58a6ff;
+  --annotation-marker: #d29922;
   --status-glow: #58a6ff;
 }
 
@@ -69,7 +71,16 @@ body[data-theme="dark"] {
 }
 
 .annotation-wrapper {
+  interpolate-size: allow-keywords;
+  height: auto;
+  overflow: hidden;
   margin: 8px 0;
+  transition: height 0.2s ease, margin 0.2s ease;
+}
+
+.annotation-wrapper--collapsed {
+  height: 0;
+  margin: 0;
 }
 
 .annotation-block {
@@ -125,8 +136,8 @@ body[data-theme="dark"] {
 }
 
 .gutter-annotation-dot {
-  border-radius: 50%;
-  background: var(--tab-changed-dot);
+  border-radius: 2px;
+  background: var(--annotation-marker);
   flex-shrink: 0;
   position: absolute;
   transition: opacity 0.15s;
@@ -139,7 +150,7 @@ body[data-theme="dark"] {
 .gutter-annotation-range-line {
   position: absolute;
   width: 2px;
-  background: var(--tab-changed-dot);
+  background: var(--annotation-marker);
   transition: opacity 0.15s;
 }
 

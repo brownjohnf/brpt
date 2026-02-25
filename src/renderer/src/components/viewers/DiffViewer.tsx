@@ -222,7 +222,7 @@ export function DiffContent({ tab, viewMode }: DiffContentProps): ReactNode {
       <AnnotationGutter
         contentEl={contentEl}
         measureLines={measureDiffByFilesLines}
-        deps={[tab.diff, tab.annotations, collapsedInsertionLines]}
+        contentKey={tab.diff}
         annotations={tab.annotations}
         collapsedInsertionLines={collapsedInsertionLines}
         onDotClick={handleDotClick}
@@ -243,8 +243,14 @@ export function DiffContent({ tab, viewMode }: DiffContentProps): ReactNode {
                   dangerouslySetInnerHTML={{ __html: chunk.diffHtml }}
                 />
               )}
-              {!collapsedInsertionLines.has(chunk.endLine) && chunk.annotations.map((a, j) => (
-                <div key={j} className="annotation-wrapper">
+              {chunk.annotations.map((a, j) => (
+                <div
+                  key={j}
+                  className={classNames(
+                    "annotation-wrapper",
+                    collapsedInsertionLines.has(chunk.endLine) && "annotation-wrapper--collapsed",
+                  )}
+                >
                   <div className="annotation-block">
                     <div
                       className="markdown-body"

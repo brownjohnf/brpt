@@ -315,7 +315,7 @@ export function MarkdownContent({
         <AnnotationGutter
           contentEl={contentEl}
           measureLines={measureMarkdownLines}
-          deps={[tab.content, tab.annotations, collapsedInsertionLines]}
+          contentKey={tab.content}
           annotations={tab.annotations}
           collapsedInsertionLines={collapsedInsertionLines}
           onDotClick={handleDotClick}
@@ -332,8 +332,14 @@ export function MarkdownContent({
                     dangerouslySetInnerHTML={{ __html: chunk.html }}
                   />
                 )}
-                {!collapsedInsertionLines.has(chunk.endLine) && chunk.annotations.map((a, j) => (
-                  <div key={j} className="annotation-wrapper">
+                {chunk.annotations.map((a, j) => (
+                  <div
+                    key={j}
+                    className={classNames(
+                      "annotation-wrapper",
+                      collapsedInsertionLines.has(chunk.endLine) && "annotation-wrapper--collapsed",
+                    )}
+                  >
                     <div className="annotation-block">
                       <div
                         className="markdown-body"

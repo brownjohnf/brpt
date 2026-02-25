@@ -23,7 +23,7 @@ export type MeasureGutterLines = (contentEl: HTMLElement, gutterEl: HTMLElement)
 interface AnnotationGutterProps {
   contentEl: HTMLDivElement | null;
   measureLines: MeasureGutterLines;
-  deps: unknown[];
+  contentKey: unknown;
   annotations: Annotation[] | undefined;
   collapsedInsertionLines?: Set<number>;
   onDotClick?: (insertionLines: number[]) => void;
@@ -45,7 +45,7 @@ function findLineEntry(lines: GutterLine[], targetLine: number): GutterLine | nu
 export function AnnotationGutter({
   contentEl,
   measureLines,
-  deps,
+  contentKey,
   annotations,
   collapsedInsertionLines,
   onDotClick,
@@ -63,8 +63,7 @@ export function AnnotationGutter({
 
   useLayoutEffect(() => {
     measure();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [measure, ...deps]);
+  }, [measure, contentKey, annotations, collapsedInsertionLines]);
 
   useEffect(() => {
     if (!contentEl) {
