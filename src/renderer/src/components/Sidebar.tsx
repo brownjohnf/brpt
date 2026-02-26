@@ -10,6 +10,7 @@ const GROUP_MIME = "application/x-brpt-tab-group";
 interface SidebarProps {
   tabs: Tab[];
   activeIndex: number;
+  highlightedIndex: number | null;
   projects: ProjectEntry[];
   containerFolders: string[];
   groupOrder: string[];
@@ -137,6 +138,7 @@ function GroupContainer({
 export function Sidebar({
   tabs,
   activeIndex,
+  highlightedIndex,
   projects,
   containerFolders,
   groupOrder,
@@ -263,6 +265,7 @@ export function Sidebar({
                     tab={tab}
                     index={index}
                     isActive={index === activeIndex}
+                    isHighlighted={index === highlightedIndex}
                     groupRootPath={group.rootPath}
                     onClick={() => onActivateTab(index)}
                     onClose={() => onCloseTab(index)}
@@ -303,6 +306,7 @@ export function Sidebar({
                     tab={tab}
                     index={index}
                     isActive={index === activeIndex}
+                    isHighlighted={index === highlightedIndex}
                     onClick={() => onActivateTab(index)}
                     onClose={() => onCloseTab(index)}
                     onReorderTab={onReorderTab}

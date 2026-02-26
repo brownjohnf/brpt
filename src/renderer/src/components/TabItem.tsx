@@ -11,6 +11,7 @@ interface TabItemProps {
   tab: Tab;
   index: number;
   isActive: boolean;
+  isHighlighted?: boolean;
   groupRootPath?: string;
   onClick: () => void;
   onClose: () => void;
@@ -37,6 +38,7 @@ export function TabItem({
   tab,
   index,
   isActive,
+  isHighlighted,
   groupRootPath,
   onClick,
   onClose,
@@ -131,6 +133,7 @@ export function TabItem({
         color: textColor,
         borderTop: `2px solid ${dropPosition === "above" ? "var(--tab-changed-dot)" : "transparent"}`,
         borderBottom: `2px solid ${dropPosition === "below" ? "var(--tab-changed-dot)" : "transparent"}`,
+        boxShadow: isHighlighted ? "inset 6px 0 8px -8px var(--status-glow)" : undefined,
       }}
       onClick={onClick}
     >

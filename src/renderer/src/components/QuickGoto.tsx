@@ -5,6 +5,7 @@ import type { Tab } from "../types";
 interface QuickGotoProps {
   tabs: Tab[];
   onActivateTab: (index: number) => void;
+  onHighlight: (index: number | null) => void;
   onClose: () => void;
 }
 
@@ -21,6 +22,7 @@ function getDirectory(filePath: string): string {
 export function QuickGoto({
   tabs,
   onActivateTab,
+  onHighlight,
   onClose,
 }: QuickGotoProps): ReactNode {
   const [query, setQuery] = useState("");
@@ -44,8 +46,14 @@ export function QuickGoto({
   }, [query]);
 
   useEffect(() => {
+    const tabIndex = filtered[selectedIndex]?.index ?? null;
+    onHighlight(tabIndex);
+  }, [selectedIndex, filtered, onHighlight]);
+
+  useEffect(() => {
     inputRef.current?.focus();
-  }, []);
+    return () => onHighlight(null);
+  }, [onHighlight]);
 
   const handleSelect = useCallback(
     (tabIndex: number) => {

@@ -52,6 +52,7 @@ export default function App(): ReactNode {
   const [groupOrder, setGroupOrder] = useState<string[]>([]);
   const [sidebarWidth, setSidebarWidth] = useState(270);
   const [quickGotoOpen, setQuickGotoOpen] = useState(false);
+  const [quickGotoHighlight, setQuickGotoHighlight] = useState<number | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerWidth, setDrawerWidth] = useState(DEFAULT_DRAWER_WIDTH);
@@ -538,6 +539,7 @@ export default function App(): ReactNode {
         <Sidebar
           tabs={tabs}
           activeIndex={activeIndex}
+          highlightedIndex={quickGotoHighlight}
           projects={projects}
           containerFolders={containerFolders}
           groupOrder={groupOrder}
@@ -624,6 +626,7 @@ export default function App(): ReactNode {
         <QuickGoto
           tabs={tabs}
           onActivateTab={activateTab}
+          onHighlight={setQuickGotoHighlight}
           onClose={() => setQuickGotoOpen(false)}
         />
       )}
