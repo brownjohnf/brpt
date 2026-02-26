@@ -53,6 +53,7 @@ export interface AppConfig {
   brpt_development_roots?: string[];
   windowBounds?: WindowBounds;
   sidebarWidth?: number;
+  drawerWidth?: number;
 }
 
 export interface BrptNotification {

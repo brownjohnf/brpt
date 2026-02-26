@@ -326,7 +326,7 @@ export default function App(): ReactNode {
     if (config.groupOrder) { setGroupOrder(config.groupOrder); }
     if (config.contentWidth) { setContentWidth((prev) => ({ ...prev, ...config.contentWidth })); }
     if (config.sidebarWidth != null) { setSidebarWidth(config.sidebarWidth); }
-    if ((config as Record<string, unknown>).drawerWidth != null) { setDrawerWidth((config as Record<string, unknown>).drawerWidth as number); }
+    if (config.drawerWidth != null) { setDrawerWidth(config.drawerWidth); }
   }, []);
 
   // IPC listeners
