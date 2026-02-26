@@ -133,6 +133,10 @@ export function QuickGoto({
                 style={{
                   background:
                     i === selectedIndex ? "var(--tab-active-bg)" : undefined,
+                  boxShadow:
+                    i === selectedIndex
+                      ? "inset 6px 0 8px -8px var(--status-glow)"
+                      : undefined,
                 }}
                 onClick={() => handleSelect(index)}
                 onMouseEnter={() => setSelectedIndex(i)}
