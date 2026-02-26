@@ -6,13 +6,19 @@ import os
 import subprocess
 import sys
 
+PLATFORM = sys.platform
+
 def resolve_path(path):
     return os.path.realpath(path)
 
 def find_app_path():
     source = os.path.realpath(__file__)
     script_dir = os.path.dirname(source)
-    return os.path.dirname(os.path.dirname(script_dir))
+    if PLATFORM == "darwin":
+        # macOS: script is at App.app/Contents/Resources/brpt → walk up to App.app/
+        return os.path.dirname(os.path.dirname(script_dir))
+    # Linux: AppImage is co-located with the script in the same directory
+    return script_dir
 
 def load_dev_roots(config_path):
     try:
@@ -22,30 +28,59 @@ def load_dev_roots(config_path):
     except Exception:
         return []
 
+def dev_electron_bin(root):
+    """Path to the electron binary inside a dev checkout's node_modules."""
+    if PLATFORM == "darwin":
+        return os.path.join(root, "node_modules/electron/dist/Electron.app/Contents/MacOS/Electron")
+    return os.path.join(root, "node_modules/electron/dist/electron")
+
+def dev_electron_app(root):
+    """Path to the electron app directory used as target_app for a dev instance."""
+    if PLATFORM == "darwin":
+        return os.path.join(root, "node_modules/electron/dist/Electron.app")
+    return os.path.join(root, "node_modules/electron/dist")
+
 def find_app_binary(app_path):
-    """Find the executable binary inside a .app bundle."""
-    macos_dir = os.path.join(app_path, "Contents", "MacOS")
-    entries = os.listdir(macos_dir)
-    if len(entries) == 1:
+    """Find the executable binary for the packaged app."""
+    if PLATFORM == "darwin":
+        macos_dir = os.path.join(app_path, "Contents", "MacOS")
+        entries = os.listdir(macos_dir)
+        if len(entries) == 1:
+            return os.path.join(macos_dir, entries[0])
+        app_name = os.path.basename(app_path).replace(".app", "")
+        for entry in entries:
+            if entry == app_name:
+                return os.path.join(macos_dir, entry)
         return os.path.join(macos_dir, entries[0])
-    # Prefer the one matching the .app name
-    app_name = os.path.basename(app_path).replace(".app", "")
-    for entry in entries:
-        if entry == app_name:
-            return os.path.join(macos_dir, entry)
-    return os.path.join(macos_dir, entries[0])
+
+    # Linux: AppImage is co-located with the brpt script.
+    # Look for .AppImage files first, then fall back to any executable
+    # that isn't this script or a shared library.
+    script_name = os.path.basename(os.path.realpath(__file__))
+    for name in os.listdir(app_path):
+        if name.endswith(".AppImage"):
+            path = os.path.join(app_path, name)
+            if os.path.isfile(path) and os.access(path, os.X_OK):
+                return path
+    for name in os.listdir(app_path):
+        path = os.path.join(app_path, name)
+        if (os.path.isfile(path) and os.access(path, os.X_OK)
+                and name != script_name and not name.endswith(".so")):
+            return path
+    print("brpt: could not find AppImage in " + app_path, file=sys.stderr)
+    print("brpt: reinstall with 'npm run install:linux'", file=sys.stderr)
+    sys.exit(1)
 
 def find_running_dev_instance(dev_roots):
     for root in dev_roots:
-        electron_app = os.path.join(root, "node_modules/electron/dist/Electron.app")
-        electron_bin = os.path.join(electron_app, "Contents/MacOS/Electron")
+        electron_bin = dev_electron_bin(root)
         try:
             result = subprocess.run(
                 ["pgrep", "-qf", electron_bin],
                 capture_output=True,
             )
             if result.returncode == 0:
-                return electron_app
+                return dev_electron_app(root)
         except Exception:
             continue
     return None
@@ -284,23 +319,21 @@ def main():
     dev_app = find_running_dev_instance(dev_roots)
     target_app = dev_app or app_path
 
-    # When invoking Electron directly (for --annotate or --diff), it needs
-    # an entry point. In dev mode, pass the project root so Electron reads
-    # package.json → main. For packaged apps, the entry is baked in.
+    # In dev mode, pass the project root as the entry point so Electron
+    # reads package.json → main. For packaged apps, the entry is baked in.
     dev_entry = []
     if dev_app:
         for root in dev_roots:
-            electron_app = os.path.join(root, "node_modules/electron/dist/Electron.app")
-            if os.path.normpath(electron_app) == os.path.normpath(target_app):
+            if os.path.normpath(dev_electron_app(root)) == os.path.normpath(target_app):
                 dev_entry = [root]
                 break
 
+    app_bin = find_app_binary(target_app)
     had_error = False
 
     if args.notify:
         target_file, message = args.notify
         target_file = resolve_path(target_file)
-        app_bin = find_app_binary(target_app)
         cmd = [app_bin] + dev_entry + [f"--notify={target_file}", message]
         if args.foreground:
             cmd.append("--foreground")
@@ -323,9 +356,6 @@ def main():
         new_file = resolve_path(new_file)
         second_file = resolve_path(second_file)
 
-        # Launch the binary directly so Electron's single-instance lock
-        # forwards args to a running instance via the second-instance event.
-        app_bin = find_app_binary(target_app)
         cmd = [app_bin] + dev_entry + [flag, new_file, second_file]
         if args.annotate:
             annotate_path = resolve_path(args.annotate)
@@ -355,16 +385,10 @@ def main():
     if args.files and not resolved_files:
         sys.exit(1)
 
+    cmd = [app_bin] + dev_entry + resolved_files
     if annotate_arg:
-        # Must use binary directly so --annotate gets forwarded through
-        # Electron's single-instance lock (macOS `open` strips extra args).
-        app_bin = find_app_binary(target_app)
-        cmd = [app_bin] + dev_entry + resolved_files + [annotate_arg]
-        subprocess.run(cmd)
-    elif resolved_files:
-        subprocess.run(["open", "-a", target_app] + resolved_files)
-    else:
-        subprocess.run(["open", "-a", target_app])
+        cmd.append(annotate_arg)
+    subprocess.run(cmd)
 
     if had_error:
         sys.exit(1)

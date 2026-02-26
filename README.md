@@ -19,7 +19,7 @@ A live-updating preview tool for markdown files, diffs, and annotated documents.
 
 ## Install
 
-macOS only (Linux planned). The app is unsigned (no Apple Developer certificate).
+The app is unsigned (no Apple Developer certificate on macOS).
 
 Build from source:
 
@@ -27,6 +27,11 @@ Build from source:
 git clone <repo-url>
 cd brett-rad-preview-tool
 npm install
+```
+
+### macOS
+
+```bash
 npm run build:mac
 npm run install:mac
 ```
@@ -37,6 +42,21 @@ To uninstall:
 
 ```bash
 npm run uninstall:mac
+```
+
+### Linux
+
+```bash
+npm run build:linux
+npm run install:linux
+```
+
+This builds an AppImage and installs the `brpt` CLI to `~/.local/bin/`. Make sure `~/.local/bin` is on your `PATH`.
+
+To uninstall:
+
+```bash
+npm run uninstall:linux
 ```
 
 ## Usage

@@ -127,11 +127,11 @@ Never say "Honestly" - you're always honest to the best of your ability.
 - Never use a bare `git push`. Always specify the remote and branch explicitly.
 - Never use `git checkout -- <file>` to undo recent edits. Use the Edit tool instead.
 
-> **CRITICAL: ExitPlanMode Behavior**
->
-> **NEVER call `ExitPlanMode` unless the user EXPLICITLY tells you to proceed.**
-> Do NOT prompt to exit plan mode. Do NOT ask "should I proceed?" or similar.
-> Just say the plan is ready for review and STOP. Wait for explicit instruction like "do it" or "proceed".
+## Planning
+
+- Never use `EnterPlanMode` or `ExitPlanMode`. Use `/bplan` instead.
+- Plan files go in `.claude/plans/` (relative to project root).
+- When the user says "proceed" or "do it" after reviewing a plan, read the plan file and implement it. Do not re-explore or re-plan.
 
 ## Shorthand Commands
 
@@ -174,12 +174,6 @@ When writing comments that will be posted to GitHub PRs or inline code comments,
 - Do not include a "Test plan" section in GitHub PR descriptions.
 - Do not include "Generated with Claude Code" or any similar attribution in PR descriptions.
 
-## Plan Mode
-
-> **IMPORTANT: Plan file location**
->
-> Always use `.claude/plans/` (relative to project root) for plan files.
-> This applies to all operations: writing, reading, editing, opening in VS Code, etc.
 
 ## Shell Conventions
 
