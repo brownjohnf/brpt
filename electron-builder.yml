@@ -18,6 +18,13 @@ mac:
   category: public.app-category.developer-tools
   target: dir
   notarize: false
+linux:
+  icon: icon.iconset/icon_512x512.png
+  category: Utility
+  target: AppImage
+  artifactName: brpt.${ext}
+  desktop:
+    MimeType: text/markdown
 fileAssociations:
   - ext: md
     name: Markdown
