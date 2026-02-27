@@ -493,14 +493,17 @@ function buildCliProgram(): { program: Command; getResult: () => CliResult } {
     .name("brpt")
     .description("Brett's Rad Preview Tool — live-updating preview for markdown, diffs, and annotated documents")
     .option("--foreground", "bring window to front")
+    .option("--cwd <path>", "working directory for resolving relative paths (set by the launcher; only needed when bypassing brpt)")
     .argument("[files...]", "files to open")
     .addHelpText("after", "\nRun brpt --help-all for the full reference (suitable for CLAUDE.md).")
     .action((files: string[], _opts: unknown, cmd: Command) => {
       if (files.length > 0) {
+        const globals = cmd.optsWithGlobals();
+        const cwd = globals.cwd || process.cwd();
         result = {
           kind: "open-files",
-          files: files.map((f: string) => resolve(f)),
-          foreground: !!cmd.optsWithGlobals().foreground,
+          files: files.map((f: string) => resolve(cwd, f)),
+          foreground: !!globals.foreground,
         };
       }
     });
@@ -509,11 +512,13 @@ function buildCliProgram(): { program: Command; getResult: () => CliResult } {
     .command("diff <new-file> <patch-file>")
     .description("open a diff view from a file and a unified diff file")
     .action((newFile: string, patchFile: string, _opts: unknown, cmd: Command) => {
+      const globals = cmd.optsWithGlobals();
+      const cwd = globals.cwd || process.cwd();
       result = {
         kind: "diff",
-        newFile: resolve(newFile),
-        patchFile: resolve(patchFile),
-        foreground: !!cmd.optsWithGlobals().foreground,
+        newFile: resolve(cwd, newFile),
+        patchFile: resolve(cwd, patchFile),
+        foreground: !!globals.foreground,
       };
     });
 
@@ -521,11 +526,13 @@ function buildCliProgram(): { program: Command; getResult: () => CliResult } {
     .command("diff-files <new-file> <old-file>")
     .description("open a diff view computed from two files")
     .action((newFile: string, oldFile: string, _opts: unknown, cmd: Command) => {
+      const globals = cmd.optsWithGlobals();
+      const cwd = globals.cwd || process.cwd();
       result = {
         kind: "diff-files",
-        newFile: resolve(newFile),
-        oldFile: resolve(oldFile),
-        foreground: !!cmd.optsWithGlobals().foreground,
+        newFile: resolve(cwd, newFile),
+        oldFile: resolve(cwd, oldFile),
+        foreground: !!globals.foreground,
       };
     });
 
@@ -538,12 +545,14 @@ function buildCliProgram(): { program: Command; getResult: () => CliResult } {
     )
     .option("--message-file <path>", "path to file containing notification body (markdown)")
     .action((target: string, message: string, opts: { messageFile?: string }, cmd: Command) => {
+      const globals = cmd.optsWithGlobals();
+      const cwd = globals.cwd || process.cwd();
       result = {
         kind: "notify",
-        target: resolve(target),
+        target: resolve(cwd, target),
         message,
-        messageFile: opts.messageFile ? resolve(opts.messageFile) : undefined,
-        foreground: !!cmd.optsWithGlobals().foreground,
+        messageFile: opts.messageFile ? resolve(cwd, opts.messageFile) : undefined,
+        foreground: !!globals.foreground,
       };
     });
 
@@ -561,16 +570,18 @@ function buildCliProgram(): { program: Command; getResult: () => CliResult } {
     .option("--message-file <path>", "path to file containing annotation body (markdown)")
     .option("--source <name>", "optional source identifier (e.g. agent name, tool name)")
     .action((target: string, line: string, message: string, opts: { messageFile?: string; source?: string }, cmd: Command) => {
+      const globals = cmd.optsWithGlobals();
+      const cwd = globals.cwd || process.cwd();
       const range = parseLineRange(line);
       result = {
         kind: "annotate-add",
-        target: resolve(target),
+        target: resolve(cwd, target),
         startLine: range.startLine,
         endLine: range.endLine,
         message,
-        messageFile: opts.messageFile ? resolve(opts.messageFile) : undefined,
+        messageFile: opts.messageFile ? resolve(cwd, opts.messageFile) : undefined,
         source: opts.source,
-        foreground: !!cmd.optsWithGlobals().foreground,
+        foreground: !!globals.foreground,
       };
     });
 
@@ -578,11 +589,13 @@ function buildCliProgram(): { program: Command; getResult: () => CliResult } {
     .command("import <target> <annotations-file>")
     .description("bulk import annotations from a JSON file")
     .action((target: string, importFile: string, _opts: unknown, cmd: Command) => {
+      const globals = cmd.optsWithGlobals();
+      const cwd = globals.cwd || process.cwd();
       result = {
         kind: "annotate-import",
-        target: resolve(target),
-        importFile: resolve(importFile),
-        foreground: !!cmd.optsWithGlobals().foreground,
+        target: resolve(cwd, target),
+        importFile: resolve(cwd, importFile),
+        foreground: !!globals.foreground,
       };
     });
 
@@ -590,11 +603,13 @@ function buildCliProgram(): { program: Command; getResult: () => CliResult } {
     .command("remove <target> <annotation-id>")
     .description("remove a specific annotation by ID")
     .action((target: string, annotationId: string, _opts: unknown, cmd: Command) => {
+      const globals = cmd.optsWithGlobals();
+      const cwd = globals.cwd || process.cwd();
       result = {
         kind: "annotate-remove",
-        target: resolve(target),
+        target: resolve(cwd, target),
         annotationId,
-        foreground: !!cmd.optsWithGlobals().foreground,
+        foreground: !!globals.foreground,
       };
     });
 
@@ -602,10 +617,12 @@ function buildCliProgram(): { program: Command; getResult: () => CliResult } {
     .command("clear <target>")
     .description("remove all annotations for a file")
     .action((target: string, _opts: unknown, cmd: Command) => {
+      const globals = cmd.optsWithGlobals();
+      const cwd = globals.cwd || process.cwd();
       result = {
         kind: "annotate-clear",
-        target: resolve(target),
-        foreground: !!cmd.optsWithGlobals().foreground,
+        target: resolve(cwd, target),
+        foreground: !!globals.foreground,
       };
     });
 
@@ -613,10 +630,12 @@ function buildCliProgram(): { program: Command; getResult: () => CliResult } {
     .command("list <target>")
     .description("list all annotations for a file as JSON")
     .action((target: string, _opts: unknown, cmd: Command) => {
+      const globals = cmd.optsWithGlobals();
+      const cwd = globals.cwd || process.cwd();
       result = {
         kind: "annotate-list",
-        target: resolve(target),
-        foreground: !!cmd.optsWithGlobals().foreground,
+        target: resolve(cwd, target),
+        foreground: !!globals.foreground,
       };
     });
 
@@ -1095,7 +1114,8 @@ if (!gotTheLock) {
     const parsed = parseCliArgs(argv);
     handleCliResult(parsed);
 
-    const shouldFocus = ("foreground" in parsed && parsed.foreground) || parsed.kind !== "notify";
+    const backgroundByDefault = parsed.kind === "notify" || parsed.kind.startsWith("annotate");
+    const shouldFocus = ("foreground" in parsed && parsed.foreground) || !backgroundByDefault;
     if (shouldFocus && mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) {
         mainWindow.restore();
