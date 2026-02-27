@@ -532,6 +532,7 @@ export default function App(): ReactNode {
         />
         <div className="flex-1 flex flex-col overflow-hidden">
           <TopBar
+            hasUnreadNotifications={(activeTab?.unreadNotificationCount ?? 0) > 0}
             left={
               <SidebarToggle
                 sidebarOpen={sidebarOpen}
@@ -596,7 +597,6 @@ export default function App(): ReactNode {
         path={activeTab?.path ?? null}
         lastModifiedAt={activeTab?.lastModifiedAt ?? null}
         draggablePath={capabilities.draggablePath}
-        hasUnreadNotifications={(activeTab?.unreadNotificationCount ?? 0) > 0}
       />
       <Toaster theme={theme} position="bottom-center" style={{ bottom: "28px" }} />
       {quickGotoOpen && (
