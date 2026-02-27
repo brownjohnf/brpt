@@ -18,7 +18,8 @@ export type TabsAction =
   | { type: "ACTIVATE_FILE_BY_PATH"; path: string }
   | { type: "SET_NOTIFICATIONS"; path: string; notifications: BrptNotification[] }
   | { type: "ADD_NOTIFICATION"; path: string; notification: BrptNotification }
-  | { type: "MARK_NOTIFICATIONS_READ"; path: string };
+  | { type: "MARK_NOTIFICATIONS_READ"; path: string }
+  | { type: "HYDRATE_ACTIVATIONS"; tabActivations: Record<string, string> };
 
 export const initialTabsState: TabsState = {
   tabs: [],
@@ -136,9 +137,11 @@ export function tabsReducer(state: TabsState, action: TabsAction): TabsState {
           scrollTop: currentScrollTop,
         };
       }
-      if (tabs[index].hasUnseenChanges) {
-        tabs[index] = { ...tabs[index], hasUnseenChanges: false };
-      }
+      tabs[index] = {
+        ...tabs[index],
+        hasUnseenChanges: false,
+        lastActivatedAt: Temporal.Now.instant(),
+      };
       return { tabs, activeIndex: index };
     }
 
@@ -262,6 +265,18 @@ export function tabsReducer(state: TabsState, action: TabsAction): TabsState {
         notifications: tab.notifications.map((n) => ({ ...n, read: true })),
         unreadNotificationCount: 0,
       };
+      return { tabs, activeIndex: state.activeIndex };
+    }
+
+    case "HYDRATE_ACTIVATIONS": {
+      const { tabActivations } = action;
+      const tabs = state.tabs.map((tab) => {
+        const iso = tabActivations[tab.path];
+        if (!iso) {
+          return tab;
+        }
+        return { ...tab, lastActivatedAt: Temporal.Instant.from(iso) };
+      });
       return { tabs, activeIndex: state.activeIndex };
     }
   }

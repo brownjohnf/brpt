@@ -1,3 +1,7 @@
+export interface Store {
+  tabActivations: Record<string, string>;
+}
+
 export type ContentWidthMode = "fixed" | "capped" | "full";
 
 export interface ContentWidthConfig {

@@ -2,8 +2,11 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { classNames } from "../classNames";
 import type { Tab } from "../types";
 
+const isMac = navigator.platform.startsWith("Mac");
+
 interface QuickGotoProps {
   tabs: Tab[];
+  mruTabs: { tab: Tab; index: number }[];
   onActivateTab: (index: number) => void;
   onHighlight: (index: number | null) => void;
   onClose: () => void;
@@ -21,25 +24,31 @@ function getDirectory(filePath: string): string {
 
 export function QuickGoto({
   tabs,
+  mruTabs,
   onActivateTab,
   onHighlight,
   onClose,
 }: QuickGotoProps): ReactNode {
   const [query, setQuery] = useState("");
-  const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
 
-  const filtered = tabs
-    .map((tab, index) => ({ tab, index }))
-    .filter(({ tab }) => {
-      const segments = query.toLowerCase().split(/\s+/).filter(Boolean);
-      if (segments.length === 0) {
-        return true;
-      }
-      const lowerPath = tab.path.toLowerCase();
-      return segments.every((seg) => lowerPath.includes(seg));
-    });
+  const isSearching = query.trim() !== "";
+  const showingMru = !isSearching && mruTabs.length > 0;
+
+  const filtered = isSearching
+    ? tabs
+        .map((tab, index) => ({ tab, index }))
+        .filter(({ tab }) => {
+          const segments = query.toLowerCase().split(/\s+/).filter(Boolean);
+          const lowerPath = tab.path.toLowerCase();
+          return segments.every((seg) => lowerPath.includes(seg));
+        })
+    : showingMru
+      ? mruTabs
+      : tabs.map((tab, index) => ({ tab, index }));
+
+  const [selectedIndex, setSelectedIndex] = useState(0);
 
   useEffect(() => {
     setSelectedIndex(0);
@@ -91,6 +100,16 @@ export function QuickGoto({
         );
         return;
       }
+      if ((e.metaKey || e.ctrlKey) && /^[1-9]$/.test(e.key)) {
+        e.preventDefault();
+        e.nativeEvent.stopPropagation();
+        const i = parseInt(e.key, 10) - 1;
+        const item = filtered[i];
+        if (item) {
+          handleSelect(item.index);
+        }
+        return;
+      }
     },
     [filtered, selectedIndex, handleSelect, onClose],
   );
@@ -123,7 +142,7 @@ export function QuickGoto({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Go to tab..."
+          placeholder={showingMru ? "Recent tabs — type to search all..." : "Go to tab..."}
           className="w-full px-3 py-2 text-sm bg-transparent border-none outline-none"
           style={{ color: "var(--tab-active-text)" }}
         />
@@ -149,18 +168,27 @@ export function QuickGoto({
                 onClick={() => handleSelect(index)}
                 onMouseEnter={() => setSelectedIndex(i)}
               >
-                <div style={{ color: "var(--tab-active-text)" }}>
-                  {getFilename(tab.path)}
-                </div>
-                <div
-                  className="text-[11px] truncate"
-                  style={{ color: "var(--tab-text)" }}
-                >
-                  {getDirectory(tab.path)}
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div style={{ color: "var(--tab-active-text)" }}>
+                      {getFilename(tab.path)}
+                    </div>
+                    <div
+                      className="text-[11px] truncate"
+                      style={{ color: "var(--tab-text)" }}
+                    >
+                      {getDirectory(tab.path)}
+                    </div>
+                  </div>
+                  {i < 9 && (
+                    <div className="text-[11px] shrink-0" style={{ color: "var(--tab-text)" }}>
+                      {isMac ? "⌘" : "^"}{i + 1}
+                    </div>
+                  )}
                 </div>
               </div>
             ))
-          ) : query.trim() !== "" ? (
+          ) : isSearching ? (
             <div
               className="px-3 py-2 text-[13px]"
               style={{ color: "var(--tab-text)" }}

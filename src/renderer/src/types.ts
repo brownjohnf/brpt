@@ -20,6 +20,7 @@ export interface BaseTab {
   path: string;
   scrollTop: number;
   lastModifiedAt: Temporal.Instant | null;
+  lastActivatedAt?: Temporal.Instant;
   hasUnseenChanges: boolean;
   removed?: boolean;
   annotations?: Annotation[];

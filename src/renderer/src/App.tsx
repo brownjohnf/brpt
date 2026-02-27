@@ -51,6 +51,16 @@ export default function App(): ReactNode {
   const [sidebarWidth, setSidebarWidth] = useState(270);
   const [quickGotoOpen, setQuickGotoOpen] = useState(false);
   const [quickGotoHighlight, setQuickGotoHighlight] = useState<number | null>(null);
+
+  const mruTabs = useMemo(() => {
+    return tabs
+      .map((tab, index) => ({ tab, index }))
+      .filter(({ tab, index }) => tab.lastActivatedAt != null && index !== activeIndex)
+      .sort((a, b) =>
+        Temporal.Instant.compare(b.tab.lastActivatedAt!, a.tab.lastActivatedAt!)
+      )
+      .slice(0, 5);
+  }, [tabs, activeIndex]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerWidth, setDrawerWidth] = useState(DEFAULT_DRAWER_WIDTH);
@@ -110,8 +120,12 @@ export default function App(): ReactNode {
         index,
         currentScrollTop: mainRef.current?.scrollTop ?? 0,
       });
+      const path = tabs[index]?.path;
+      if (path) {
+        mdview.tabActivated(path);
+      }
     },
-    [],
+    [tabs],
   );
 
   const changeContentWidthMode = useCallback((mode: ContentWidthMode) => {
@@ -322,6 +336,9 @@ export default function App(): ReactNode {
     if (config.contentWidth) { setContentWidth((prev) => ({ ...prev, ...config.contentWidth })); }
     if (config.sidebarWidth != null) { setSidebarWidth(config.sidebarWidth); }
     if (config.drawerWidth != null) { setDrawerWidth(config.drawerWidth); }
+    mdview.getStore().then((store) => {
+      dispatch({ type: "HYDRATE_ACTIVATIONS", tabActivations: store.tabActivations });
+    });
   }, []);
 
   // IPC listeners
@@ -484,7 +501,7 @@ export default function App(): ReactNode {
         }
         return;
       }
-      if (mod && !e.shiftKey && e.key >= "1" && e.key <= "9") {
+      if (mod && !e.shiftKey && e.key >= "1" && e.key <= "9" && !quickGotoOpen) {
         e.preventDefault();
         const target = e.key === "9"
           ? lastVisualTab()
@@ -497,7 +514,7 @@ export default function App(): ReactNode {
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [activeIndex, tabs, projects, containerFolders, groupOrder, closeTab, handleOpenDialog, activateTab, openFile]);
+  }, [activeIndex, tabs, projects, containerFolders, groupOrder, closeTab, handleOpenDialog, activateTab, openFile, quickGotoOpen]);
 
   // Apply theme to document and toggle stylesheets
   useThemeStyles(theme);
@@ -622,6 +639,7 @@ export default function App(): ReactNode {
       {quickGotoOpen && (
         <QuickGoto
           tabs={tabs}
+          mruTabs={mruTabs}
           onActivateTab={activateTab}
           onHighlight={setQuickGotoHighlight}
           onClose={() => setQuickGotoOpen(false)}

@@ -16,6 +16,7 @@ import type {
   OpenEntry,
   SavedDiff,
   SidecarExtras,
+  Store,
 } from "../shared/types";
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -32,6 +33,7 @@ const DEFAULT_CONFIG: AppConfig = {
 const DEFAULT_CONFIG_PATH = join(os.homedir(), ".brpt", "brpt-config.json");
 const CONFIG_PATH = process.env.BRPT_CONFIG || DEFAULT_CONFIG_PATH;
 const SIDECARS_DIR = join(dirname(CONFIG_PATH), "sidecars");
+const STORE_PATH = join(dirname(CONFIG_PATH), "store.json");
 
 let mainWindow: BrowserWindow | null = null;
 let windowReady = false;
@@ -64,6 +66,37 @@ function saveConfig(config: AppConfig): void {
   } catch (err) {
     console.error(`Failed to save config to ${CONFIG_PATH}:`, err);
   }
+}
+
+function loadStore(): Store {
+  try {
+    return JSON.parse(fs.readFileSync(STORE_PATH, "utf-8"));
+  } catch {
+    return { tabActivations: {} };
+  }
+}
+
+let storeWriteTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingStore: Store | null = null;
+
+function saveStore(store: Store): void {
+  pendingStore = store;
+  if (storeWriteTimer) {
+    clearTimeout(storeWriteTimer);
+  }
+  storeWriteTimer = setTimeout(() => {
+    storeWriteTimer = null;
+    if (!pendingStore) {
+      return;
+    }
+    try {
+      fs.mkdirSync(dirname(STORE_PATH), { recursive: true });
+      fs.writeFileSync(STORE_PATH, JSON.stringify(pendingStore, null, 2));
+    } catch (err) {
+      console.error(`Failed to save store to ${STORE_PATH}:`, err);
+    }
+    pendingStore = null;
+  }, 1000);
 }
 
 
@@ -1285,4 +1318,14 @@ ipcMain.on("dismiss-annotation", (_event, targetPath: string, annotationId: stri
 ipcMain.on("start-file-drag", async (event, filePath: string) => {
   const icon = await app.getFileIcon(filePath, { size: "small" });
   event.sender.startDrag({ file: filePath, icon });
+});
+
+ipcMain.handle("get-store", () => {
+  return loadStore();
+});
+
+ipcMain.on("tab-activated", (_event, path: string) => {
+  const store = loadStore();
+  store.tabActivations[path] = new Date().toISOString();
+  saveStore(store);
 });

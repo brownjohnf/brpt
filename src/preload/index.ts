@@ -3,8 +3,8 @@ import hljs from "highlight.js";
 import { Marked, type Token, type Tokens } from "marked";
 import { markedHighlight } from "marked-highlight";
 import os from "os";
-import type { Annotation, AppConfig, BrptNotification, DiffData, FileData, OpenEntry, SidecarExtras } from "../shared/types";
-export type { AppConfig, BrptNotification, DiffData, FileData, OpenEntry, SidecarExtras };
+import type { Annotation, AppConfig, BrptNotification, DiffData, FileData, OpenEntry, SidecarExtras, Store } from "../shared/types";
+export type { AppConfig, BrptNotification, DiffData, FileData, OpenEntry, SidecarExtras, Store };
 
 export interface MdviewApi {
   renderMarkdown(text: string, startLine?: number): string;
@@ -29,6 +29,8 @@ export interface MdviewApi {
   markNotificationsRead(targetPath: string): void;
   dismissAnnotation(targetPath: string, annotationId: string): void;
   startFileDrag(filePath: string): void;
+  getStore(): Promise<Store>;
+  tabActivated(path: string): void;
   homedir: string;
 }
 
@@ -332,6 +334,9 @@ const api: MdviewApi = {
     ipcRenderer.send("dismiss-annotation", targetPath, annotationId),
   startFileDrag: (filePath: string) =>
     ipcRenderer.send("start-file-drag", filePath),
+  getStore: () => ipcRenderer.invoke("get-store"),
+  tabActivated: (path: string) =>
+    ipcRenderer.send("tab-activated", path),
   homedir: os.homedir(),
 };
 
