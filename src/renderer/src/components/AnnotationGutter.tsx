@@ -18,11 +18,18 @@ export interface GutterLine {
   bottom: number;
 }
 
-export type MeasureGutterLines = (contentEl: HTMLElement, gutterEl: HTMLElement) => GutterLine[];
+export interface GutterElement {
+  el: HTMLElement;
+  line: number;
+}
+
+export type FindGutterElements = (contentEl: HTMLElement) => GutterElement[];
+export type ReadGutterPositions = (elements: GutterElement[], gutterEl: HTMLElement) => GutterLine[];
 
 interface AnnotationGutterProps {
   contentEl: HTMLDivElement | null;
-  measureLines: MeasureGutterLines;
+  findElements: FindGutterElements;
+  readPositions: ReadGutterPositions;
   contentKey: unknown;
   annotations: Annotation[] | undefined;
   collapsedInsertionLines?: Set<number>;
@@ -44,7 +51,8 @@ function findLineEntry(lines: GutterLine[], targetLine: number): GutterLine | nu
 
 export function AnnotationGutter({
   contentEl,
-  measureLines,
+  findElements,
+  readPositions,
   contentKey,
   annotations,
   collapsedInsertionLines,
@@ -52,18 +60,25 @@ export function AnnotationGutter({
 }: AnnotationGutterProps): ReactNode {
   const [lines, setLines] = useState<GutterLine[]>([]);
   const gutterRef = useRef<HTMLDivElement>(null);
+  const elementsRef = useRef<GutterElement[]>([]);
+
+  const refreshElements = useCallback(() => {
+    if (!contentEl) { return; }
+    elementsRef.current = findElements(contentEl);
+  }, [contentEl, findElements]);
 
   const measure = useCallback(() => {
     const gutter = gutterRef.current;
-    if (!contentEl || !gutter) {
+    if (!gutter || elementsRef.current.length === 0) {
       return;
     }
-    setLines(measureLines(contentEl, gutter));
-  }, [contentEl, measureLines]);
+    setLines(readPositions(elementsRef.current, gutter));
+  }, [readPositions]);
 
   useLayoutEffect(() => {
+    refreshElements();
     measure();
-  }, [measure, contentKey, annotations]);
+  }, [refreshElements, measure, contentKey, annotations]);
 
   useLayoutEffect(() => {
     measure();
@@ -83,9 +98,20 @@ export function AnnotationGutter({
     if (!contentEl) {
       return;
     }
-    const observer = new ResizeObserver(measure);
+    let raf = 0;
+    const observer = new ResizeObserver(() => {
+      if (!raf) {
+        raf = requestAnimationFrame(() => {
+          raf = 0;
+          measure();
+        });
+      }
+    });
     observer.observe(contentEl);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(raf);
+    };
   }, [contentEl, measure]);
 
   const { annotatedLines, dotInsertionLines } = useMemo(() => {
