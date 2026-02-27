@@ -20,7 +20,7 @@ mac:
   notarize: false
 linux:
   icon: icon.iconset/icon_512x512.png
-  category: Utility
+  category: Development
   target: AppImage
   artifactName: brpt.${ext}
   desktop:
@@ -29,7 +29,4 @@ fileAssociations:
   - ext: md
     name: Markdown
     role: Viewer
-linux:
-  target: AppImage
-  category: Development
 npmRebuild: false
