@@ -564,6 +564,27 @@ export default function App(): ReactNode {
               />
             )}
           </TopBar>
+          {activeTab?.removed && (
+            <div
+              className="px-4 py-2 text-sm border-b border-[var(--sidebar-border)] shrink-0"
+              style={{
+                background: "var(--tab-hover-bg)",
+                color: "var(--status-text)",
+              }}
+            >
+              This file has been deleted or moved.
+              <button
+                className="ml-2 px-2 py-0.5 rounded text-[13px] cursor-pointer border-none"
+                style={{
+                  background: "var(--sidebar-border)",
+                  color: "var(--tab-active-text)",
+                }}
+                onClick={() => handleRetryRemoved(activeTab.path)}
+              >
+                Retry
+              </button>
+            </div>
+          )}
           <div className="flex-1 flex overflow-hidden">
             <ContentArea
               ref={mainRef}
@@ -574,7 +595,6 @@ export default function App(): ReactNode {
                 <MarkdownContent
                   tab={activeTab}
                   contentWidth={contentWidth}
-                  onRetryRemoved={handleRetryRemoved}
                 />
               )}
               {activeTab?.kind === "diff" && (

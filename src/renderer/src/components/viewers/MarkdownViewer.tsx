@@ -163,7 +163,6 @@ function measureMarkdownLines(contentEl: HTMLElement, gutterEl: HTMLElement): Gu
 interface MarkdownContentProps {
   tab: MarkdownTab;
   contentWidth: ContentWidthConfig;
-  onRetryRemoved: (path: string) => void;
 }
 
 interface AnnotatedChunk {
@@ -238,7 +237,6 @@ function buildAnnotatedChunks(content: string, annotations: Annotation[]): Annot
 export function MarkdownContent({
   tab,
   contentWidth,
-  onRetryRemoved,
 }: MarkdownContentProps): ReactNode {
   const hasAnnotations = tab.annotations && tab.annotations.length > 0;
   const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null);
@@ -289,28 +287,6 @@ export function MarkdownContent({
 
   return (
     <>
-      {tab.removed && (
-        <div
-          className="mx-auto mb-4 px-3 py-2 rounded text-sm"
-          style={{
-            ...contentStyle,
-            background: "var(--tab-hover-bg)",
-            color: "var(--status-text)",
-          }}
-        >
-          This file has been deleted or moved.
-          <button
-            className="ml-2 px-2 py-0.5 rounded text-[13px] cursor-pointer border-none"
-            style={{
-              background: "var(--sidebar-border)",
-              color: "var(--tab-active-text)",
-            }}
-            onClick={() => onRetryRemoved(tab.path)}
-          >
-            Retry
-          </button>
-        </div>
-      )}
       <div className="flex min-h-full">
         <AnnotationGutter
           contentEl={contentEl}
