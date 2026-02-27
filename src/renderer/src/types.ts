@@ -2,7 +2,6 @@ import type { Annotation, BrptNotification, DiffMode } from "../../shared/types"
 
 export type {
   Annotation,
-  AnnotationData,
   AppConfig,
   BrptNotification,
   ContentWidthConfig,
@@ -14,6 +13,7 @@ export type {
   OpenFileEntry,
   ProjectEntry,
   SavedDiff,
+  SidecarExtras,
 } from "../../shared/types";
 
 export interface BaseTab {
@@ -22,7 +22,6 @@ export interface BaseTab {
   lastModifiedAt: Temporal.Instant | null;
   hasUnseenChanges: boolean;
   removed?: boolean;
-  annotationPath?: string;
   annotations?: Annotation[];
   notifications: BrptNotification[];
   unreadNotificationCount: number;

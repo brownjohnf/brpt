@@ -19,23 +19,30 @@ export type SavedDiff =
   | { type: "diff"; file: string; diffFile: string }
   | { type: "diff-by-files"; file: string; oldFile: string };
 
-export interface Annotation {
-  line?: number;
-  startLine?: number;
-  endLine?: number;
-  format: string;
+export interface BrptNotification {
+  id: string;
   content: string;
+  receivedAt: string;
+  read: boolean;
 }
 
-export interface AnnotationData {
+export interface Annotation {
+  id: string;
+  startLine: number;
+  endLine: number;
+  format: string;
+  content: string;
+  source?: string;
+}
+
+export interface SidecarExtras {
   targetPath: string;
-  annotationPath: string;
+  notifications: BrptNotification[];
   annotations: Annotation[];
 }
 
 export interface OpenFileEntry {
   entry: string | SavedDiff;
-  annotationFile?: string;
 }
 
 export type OpenEntry = string | OpenFileEntry;
@@ -54,13 +61,6 @@ export interface AppConfig {
   windowBounds?: WindowBounds;
   sidebarWidth?: number;
   drawerWidth?: number;
-}
-
-export interface BrptNotification {
-  id: string;
-  content: string;
-  receivedAt: string;
-  read: boolean;
 }
 
 export interface FileData {

@@ -4,6 +4,7 @@ interface StatusBarProps {
   path: string | null;
   lastModifiedAt: Temporal.Instant | null;
   draggablePath?: string;
+  hasUnreadNotifications?: boolean;
 }
 
 const RECENCY_THRESHOLD_MS = 30_000;
@@ -129,6 +130,7 @@ export function StatusBar({
   path,
   lastModifiedAt,
   draggablePath,
+  hasUnreadNotifications,
 }: StatusBarProps): ReactNode {
   const handleDragStart = useCallback(
     (e: React.DragEvent) => {
@@ -142,11 +144,14 @@ export function StatusBar({
 
   return (
     <div
-      className="
+      className={`
         h-7 flex items-center px-3 text-xs gap-2
-        bg-[var(--status-bg)] border-t border-[var(--status-border)]
-        text-[var(--status-text)]
-      "
+        border-t transition-colors duration-300
+        ${hasUnreadNotifications
+          ? "bg-[var(--status-glow)]/15 border-[var(--status-glow)]/30 text-[var(--status-glow)]"
+          : "bg-[var(--status-bg)] border-[var(--status-border)] text-[var(--status-text)]"
+        }
+      `}
     >
       {draggablePath && (
         <span

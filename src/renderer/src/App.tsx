@@ -19,7 +19,6 @@ import {
 } from "./components/viewers/MarkdownViewer";
 import { initialTabsState, tabsReducer } from "./tabsReducer";
 import type {
-  AnnotationData,
   AppConfig,
   ContentWidthConfig,
   ContentWidthMode,
@@ -27,7 +26,6 @@ import type {
   DiffTab,
   FileData,
   OpenEntry,
-  OpenFileEntry,
   ProjectEntry,
   SavedDiff,
 } from "./types";
@@ -93,14 +91,12 @@ export default function App(): ReactNode {
         } else {
           inner = tab.path;
         }
-        const entry: OpenEntry = (tab.annotationPath || typeof inner !== "string")
-          ? { entry: inner, ...(tab.annotationPath && { annotationFile: tab.annotationPath }) }
-          : inner;
+        const entry: OpenEntry = typeof inner !== "string" ? { entry: inner } : inner;
         recentlyClosed.current.push(entry);
         if (recentlyClosed.current.length > 20) {
           recentlyClosed.current.shift();
         }
-        mdview.closeFile(tab.path, tab.annotationPath);
+        mdview.closeFile(tab.path);
       }
       dispatch({ type: "CLOSE_TAB", index });
     },
@@ -251,15 +247,18 @@ export default function App(): ReactNode {
     [openFile],
   );
 
-  // Load notifications for newly opened tabs
-  const loadedNotificationPaths = useRef(new Set<string>());
+  // Load sidecar data (notifications + annotations) for newly opened tabs
+  const loadedSidecarPaths = useRef(new Set<string>());
   useEffect(() => {
     for (const tab of tabs) {
-      if (!loadedNotificationPaths.current.has(tab.path)) {
-        loadedNotificationPaths.current.add(tab.path);
-        mdview.getNotifications(tab.path).then((notifications) => {
-          if (notifications.length > 0) {
-            dispatch({ type: "SET_NOTIFICATIONS", path: tab.path, notifications });
+      if (!loadedSidecarPaths.current.has(tab.path)) {
+        loadedSidecarPaths.current.add(tab.path);
+        mdview.getExtras(tab.path).then((extras) => {
+          if (extras.notifications.length > 0) {
+            dispatch({ type: "SET_NOTIFICATIONS", path: tab.path, notifications: extras.notifications });
+          }
+          if (extras.annotations.length > 0) {
+            dispatch({ type: "SET_ANNOTATIONS", targetPath: tab.path, annotations: extras.annotations });
           }
         });
       }
@@ -283,12 +282,8 @@ export default function App(): ReactNode {
             inner = t.path;
           }
 
-          if (t.annotationPath || typeof inner !== "string") {
-            const envelope: OpenFileEntry = { entry: inner };
-            if (t.annotationPath) {
-              envelope.annotationFile = t.annotationPath;
-            }
-            return envelope;
+          if (typeof inner !== "string") {
+            return { entry: inner };
           }
           return inner;
         });
@@ -347,19 +342,10 @@ export default function App(): ReactNode {
       mdview.onDiffUpdated((data: DiffData) => {
         dispatch({ type: "DIFF_UPDATED", data });
       }),
-      mdview.onAnnotationsFromArgs((data: AnnotationData) => {
+      mdview.onAnnotationsUpdated((data) => {
         dispatch({
           type: "SET_ANNOTATIONS",
           targetPath: data.targetPath,
-          annotationPath: data.annotationPath,
-          annotations: data.annotations,
-        });
-      }),
-      mdview.onAnnotationsUpdated((data: AnnotationData) => {
-        dispatch({
-          type: "SET_ANNOTATIONS",
-          targetPath: data.targetPath,
-          annotationPath: data.annotationPath,
           annotations: data.annotations,
         });
       }),
@@ -455,32 +441,22 @@ export default function App(): ReactNode {
         const entry = recentlyClosed.current.pop();
         if (entry) {
           const inner = typeof entry === "string" ? entry : entry.entry;
-          const annotationFile = typeof entry === "string" ? undefined : entry.annotationFile;
           if (typeof inner === "string") {
             mdview.requestFile(inner).then((result) => {
               if (result) {
                 openFile(result);
-                if (annotationFile) {
-                  mdview.requestAnnotations(inner, annotationFile);
-                }
               }
             });
           } else if (inner.type === "diff") {
             mdview.requestDiff(inner.file, inner.diffFile).then((result) => {
               if (result) {
                 openDiff(result);
-                if (annotationFile) {
-                  mdview.requestAnnotations(inner.file, annotationFile);
-                }
               }
             });
           } else if (inner.type === "diff-by-files") {
             mdview.requestDiffByFiles(inner.file, inner.oldFile).then((result) => {
               if (result) {
                 openDiff(result);
-                if (annotationFile) {
-                  mdview.requestAnnotations(inner.file, annotationFile);
-                }
               }
             });
           }
@@ -620,6 +596,7 @@ export default function App(): ReactNode {
         path={activeTab?.path ?? null}
         lastModifiedAt={activeTab?.lastModifiedAt ?? null}
         draggablePath={capabilities.draggablePath}
+        hasUnreadNotifications={(activeTab?.unreadNotificationCount ?? 0) > 0}
       />
       <Toaster theme={theme} position="bottom-center" style={{ bottom: "28px" }} />
       {quickGotoOpen && (

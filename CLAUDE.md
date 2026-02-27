@@ -58,6 +58,10 @@ npm run dev                        # Dev mode with HMR
 npm run dev -- -- path/to/file.md  # Dev mode, open a file
 ```
 
+**This is the brpt source repo.** Always use `python3 resources/brpt` instead of the installed `brpt` command — the installed copy points to the packaged app which may be stale. This applies to all brpt invocations: opening files, sending notifications, etc.
+
+**Do not start or stop the dev server (`npm run dev`).** The user manages the dev server themselves. Only run typechecks, builds, and other non-server commands.
+
 ## Building
 
 ```bash

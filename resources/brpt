@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 
-import argparse
 import json
 import os
 import subprocess
 import sys
+import tempfile
 
 PLATFORM = sys.platform
 
-def resolve_path(path):
-    return os.path.realpath(path)
 
 def find_app_path():
     source = os.path.realpath(__file__)
@@ -20,6 +18,7 @@ def find_app_path():
     # Linux: AppImage is co-located with the script in the same directory
     return script_dir
 
+
 def load_dev_roots(config_path):
     try:
         with open(config_path) as f:
@@ -28,17 +27,20 @@ def load_dev_roots(config_path):
     except Exception:
         return []
 
+
 def dev_electron_bin(root):
     """Path to the electron binary inside a dev checkout's node_modules."""
     if PLATFORM == "darwin":
         return os.path.join(root, "node_modules/electron/dist/Electron.app/Contents/MacOS/Electron")
     return os.path.join(root, "node_modules/electron/dist/electron")
 
+
 def dev_electron_app(root):
     """Path to the electron app directory used as target_app for a dev instance."""
     if PLATFORM == "darwin":
         return os.path.join(root, "node_modules/electron/dist/Electron.app")
     return os.path.join(root, "node_modules/electron/dist")
+
 
 def find_app_binary(app_path):
     """Find the executable binary for the packaged app."""
@@ -54,8 +56,6 @@ def find_app_binary(app_path):
         return os.path.join(macos_dir, entries[0])
 
     # Linux: AppImage is co-located with the brpt script.
-    # Look for .AppImage files first, then fall back to any executable
-    # that isn't this script or a shared library.
     script_name = os.path.basename(os.path.realpath(__file__))
     for name in os.listdir(app_path):
         if name.endswith(".AppImage"):
@@ -71,6 +71,7 @@ def find_app_binary(app_path):
     print("brpt: reinstall with 'npm run install:linux'", file=sys.stderr)
     sys.exit(1)
 
+
 def find_running_dev_instance(dev_roots):
     for root in dev_roots:
         electron_bin = dev_electron_bin(root)
@@ -85,232 +86,29 @@ def find_running_dev_instance(dev_roots):
             continue
     return None
 
-HELP_TEXT = """\
-brpt — Brett's Rad Preview Tool
 
-A live-updating preview tool for markdown files, diffs, and annotated
-documents. Built with Electron. Files are watched on disk and the preview
-auto-refreshes when they change. This makes it useful as a render target
-for other tools — write a markdown file, point brpt at it, and see live
-updates as the file changes.
+def stdin_bridge_index(args):
+    """Find the index of a `-` arg that means 'read from stdin'.
 
-The app is single-instance: if brpt is already running, new invocations
-forward their arguments to the existing window and exit. Tabs persist
-across sessions and are restored on launch.
+    Returns the index of `-` if found in a position where it serves as
+    the message body for `notify` or `annotate add`, otherwise -1.
+    """
+    try:
+        idx = args.index("-")
+    except ValueError:
+        return -1
+    # `-` must come after a command that accepts a message body
+    preceding = args[:idx]
+    # `brpt notify <target> -`
+    if "notify" in preceding:
+        return idx
+    # `brpt annotate add <target> <line> -`
+    if "annotate" in preceding and "add" in preceding:
+        return idx
+    return -1
 
-USAGE
-    brpt [file ...]
-    brpt --diff <new-file> <diff-file>
-    brpt --diff-by-files <new-file> <old-file>
-    brpt <file> --annotate <annotation-file>
-    brpt --diff-by-files <new> <old> --annotate <annotation-file>
-    brpt --notify <target-file> <message>
-    brpt --foreground --notify <target-file> <message>
-
-MODES
-
-  Plain file view (default):
-
-    brpt README.md
-    brpt file1.md file2.md file3.md
-
-    Opens one or more files as tabs. Each file is watched for changes
-    and the preview updates automatically. Any text file works, though
-    markdown files get full rendering with syntax-highlighted code blocks.
-
-  Diff from a unified diff file:
-
-    brpt --diff document.md changes.patch
-
-    Opens a diff view. The first argument is the "new" file (the current
-    version). The second argument is a unified diff file (the output of
-    `diff -u` or `git diff`). The diff is rendered with line-by-line or
-    side-by-side view modes. Both files are watched — if either changes,
-    the diff view updates.
-
-  Diff computed from two files:
-
-    brpt --diff-by-files document.md document.old.md
-
-    Opens a diff view computed by comparing the two files. The first
-    argument is the "new" file, the second is the "old" file. The diff
-    is computed internally. Both files are watched for changes.
-
-ANNOTATIONS
-
-    brpt document.md --annotate annotations.json
-    brpt --diff-by-files new.md old.md --annotate annotations.json
-
-    Annotations attach contextual notes to specific lines of a file or
-    diff. The annotation file is a JSON file that is watched for changes,
-    so annotations update live as the file is modified.
-
-    The --annotate flag works with all modes: plain files, --diff, and
-    --diff-by-files.
-
-  Annotation file format:
-
-    The JSON file must contain an "annotations" array. Each annotation
-    targets either a single line or a line range in the primary document:
-
-    {
-      "annotations": [
-        {
-          "line": 5,
-          "format": "markdown",
-          "content": "This line has a bug — see the fix below:\\n\\n```js\\nfixed()\\n```"
-        },
-        {
-          "startLine": 10,
-          "endLine": 15,
-          "format": "markdown",
-          "content": "This section needs an index on `created_at`."
-        }
-      ]
-    }
-
-  Annotation fields:
-
-    line          Target a single source line (1-indexed).
-    startLine     Start of a line range (1-indexed). Use with endLine.
-    endLine       End of a line range (1-indexed). Use with startLine.
-    format        Content format. Currently only "markdown" is supported.
-    content       The annotation body. Rendered as markdown, so code
-                  blocks, inline code, links, etc. all work.
-
-  Line numbers:
-
-    Line numbers refer to the primary document's source lines, not
-    rendered output lines. For --diff-by-files, line numbers refer to
-    the "new" file. For --diff, line numbers refer to the diff text
-    itself.
-
-  How it renders:
-
-    Annotations appear as highlighted blocks interleaved with the
-    document content at their target line positions. In the gutter,
-    annotated lines are marked with blue dots. Range annotations show
-    two dots connected by a vertical line.
-
-  Programmatic usage:
-
-    Annotations are designed to be generated by other tools. A typical
-    workflow is:
-
-    1. Write a markdown file with your content.
-    2. Generate an annotations JSON file from your tool (linter, code
-       review, AI agent, etc.).
-    3. Run: brpt document.md --annotate annotations.json
-    4. Both files are watched — update either one and the preview
-       refreshes automatically.
-
-NOTIFICATIONS
-
-    brpt --notify README.md "Check the **formatting** on line 12."
-    brpt --foreground --notify README.md "Build failed — see errors."
-
-    Notifications send a markdown message associated with a target file.
-    The message is persisted to disk and delivered to the app. If the
-    target file is open as a tab, a bell icon appears in the status bar
-    with an unread indicator. Click the bell to open the notification
-    drawer.
-
-    By default, --notify sends without bringing the app to the
-    foreground. Add --foreground to also focus the window.
-
-    Notifications are designed for programmatic use — other tools (CI,
-    linters, AI agents) can push messages into brpt about specific files.
-
-OPTIONS
-
-    --diff NEW_FILE DIFF_FILE
-        Open a diff view from a file and a unified diff file.
-
-    --diff-by-files NEW_FILE OLD_FILE
-        Open a diff view computed from two files.
-
-    --annotate ANNOTATION_FILE
-        Attach an annotation JSON file to the opened tab.
-
-    --notify TARGET_FILE MESSAGE
-        Send a markdown notification associated with the target file.
-        The message is stored and delivered to the app. Does not bring
-        the app to the foreground unless --foreground is also specified.
-
-    --foreground
-        Bring the app to the foreground. Used with --notify to also
-        focus the window when sending a notification.
-
-    --help
-        Show this help message.
-
-CONFIGURATION
-
-    Config is stored at ~/.brpt/brpt-config.json (override with the
-    BRPT_CONFIG environment variable). The config file is managed by
-    the app and generally should not be edited by hand, but relevant
-    fields include:
-
-    theme                    "light" or "dark"
-    openFiles                Persisted tab state (restored on launch)
-    containerFolders         Project roots for grouping tabs in sidebar
-    brpt_development_roots   Paths to brpt source checkouts (for dev
-                             mode forwarding — see below)
-
-DEV MODE
-
-    If brpt_development_roots is set in the config and a running
-    `electron-vite dev` instance is detected at one of those roots,
-    brpt forwards files to the dev instance instead of the packaged app.
-    This allows testing changes without rebuilding.
-
-    To run brpt from source during development:
-
-        python3 resources/brpt [args...]
-
-    Do NOT use the installed /usr/local/bin/brpt symlink during
-    development — it points to the packaged app's copy which may be
-    stale.
-"""
 
 def main():
-    if "--help" in sys.argv or "-h" in sys.argv:
-        print(HELP_TEXT.rstrip())
-        sys.exit(0)
-
-    parser = argparse.ArgumentParser(add_help=False)
-
-    mode = parser.add_mutually_exclusive_group()
-    mode.add_argument(
-        "--diff",
-        nargs=2,
-        metavar=("NEW_FILE", "DIFF_FILE"),
-    )
-    mode.add_argument(
-        "--diff-by-files",
-        nargs=2,
-        metavar=("NEW_FILE", "OLD_FILE"),
-    )
-    mode.add_argument(
-        "--notify",
-        nargs=2,
-        metavar=("TARGET_FILE", "MESSAGE"),
-    )
-    parser.add_argument(
-        "--annotate",
-        metavar="ANNOTATION_FILE",
-    )
-    parser.add_argument(
-        "--foreground",
-        action="store_true",
-    )
-    parser.add_argument(
-        "files",
-        nargs="*",
-    )
-
-    args = parser.parse_args()
-
     config_path = os.environ.get("BRPT_CONFIG") or os.path.join(
         os.path.expanduser("~"), ".brpt", "brpt-config.json"
     )
@@ -329,69 +127,27 @@ def main():
                 break
 
     app_bin = find_app_binary(target_app)
-    had_error = False
+    user_args = sys.argv[1:]
 
-    if args.notify:
-        target_file, message = args.notify
-        target_file = resolve_path(target_file)
-        cmd = [app_bin] + dev_entry + [f"--notify={target_file}", message]
-        if args.foreground:
-            cmd.append("--foreground")
-        subprocess.run(cmd)
-        sys.exit(0)
+    # Stdin bridge: when the user passes `-` as the message body for
+    # `notify` or `annotate add`, read stdin, write to a temp file, and
+    # replace `-` with --message-file=<path>. Stdin can't cross the
+    # Electron second-instance boundary, so the launcher materializes
+    # it as a file for Electron to read.
+    dash_idx = stdin_bridge_index(user_args)
+    if dash_idx != -1:
+        content = sys.stdin.read()
+        tmp = tempfile.NamedTemporaryFile(
+            prefix="brpt-msg-", suffix=".md", delete=False, mode="w"
+        )
+        tmp.write(content)
+        tmp.close()
+        user_args = user_args[:dash_idx] + [f"--message-file={tmp.name}"] + user_args[dash_idx + 1:]
 
-    if args.diff or args.diff_by_files:
-        if args.diff:
-            new_file, second_file = args.diff
-            flag = "--diff"
-        else:
-            new_file, second_file = args.diff_by_files
-            flag = "--diff-by-files"
+    cmd = [app_bin] + dev_entry + ["--"] + user_args
+    result = subprocess.run(cmd)
+    sys.exit(result.returncode)
 
-        for path in [new_file, second_file]:
-            if not os.path.isfile(path):
-                print(f"brpt: {path}: No such file", file=sys.stderr)
-                sys.exit(1)
-
-        new_file = resolve_path(new_file)
-        second_file = resolve_path(second_file)
-
-        cmd = [app_bin] + dev_entry + [flag, new_file, second_file]
-        if args.annotate:
-            annotate_path = resolve_path(args.annotate)
-            if not os.path.isfile(annotate_path):
-                print(f"brpt: {args.annotate}: No such file", file=sys.stderr)
-                sys.exit(1)
-            cmd.append(f"--annotate={annotate_path}")
-        subprocess.run(cmd)
-        sys.exit(0)
-
-    annotate_arg = None
-    if args.annotate:
-        annotate_path = resolve_path(args.annotate)
-        if not os.path.isfile(annotate_path):
-            print(f"brpt: {args.annotate}: No such file", file=sys.stderr)
-            sys.exit(1)
-        annotate_arg = f"--annotate={annotate_path}"
-
-    resolved_files = []
-    for path in args.files:
-        if os.path.isfile(path):
-            resolved_files.append(resolve_path(path))
-        else:
-            print(f"brpt: {path}: No such file", file=sys.stderr)
-            had_error = True
-
-    if args.files and not resolved_files:
-        sys.exit(1)
-
-    cmd = [app_bin] + dev_entry + resolved_files
-    if annotate_arg:
-        cmd.append(annotate_arg)
-    subprocess.run(cmd)
-
-    if had_error:
-        sys.exit(1)
 
 if __name__ == "__main__":
     main()

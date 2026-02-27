@@ -109,15 +109,10 @@ export function AnnotationGutter({
 
     for (const a of annotations) {
       const insertionLine = annotationInsertionLine(a);
-      if (a.startLine != null && a.endLine != null) {
-        const startEntry = findLineEntry(lines, a.startLine);
-        const endEntry = findLineEntry(lines, a.endLine);
-        if (startEntry) { markEntry(startEntry, insertionLine); }
-        if (endEntry) { markEntry(endEntry, insertionLine); }
-      } else if (a.line != null) {
-        const entry = findLineEntry(lines, a.line);
-        if (entry) { markEntry(entry, insertionLine); }
-      }
+      const startEntry = findLineEntry(lines, a.startLine);
+      const endEntry = findLineEntry(lines, a.endLine);
+      if (startEntry) { markEntry(startEntry, insertionLine); }
+      if (endEntry && endEntry !== startEntry) { markEntry(endEntry, insertionLine); }
     }
     return { annotatedLines: set, dotInsertionLines: dotMap };
   }, [annotations, lines]);

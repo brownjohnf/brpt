@@ -341,6 +341,13 @@ export function MarkdownContent({
                     )}
                   >
                     <div className="annotation-block">
+                      <button
+                        className="annotation-dismiss"
+                        onClick={() => mdview.dismissAnnotation(tab.path, a.id)}
+                        aria-label="Dismiss annotation"
+                      >
+                        ×
+                      </button>
                       <div
                         className="markdown-body"
                         dangerouslySetInnerHTML={{ __html: mdview.renderMarkdown(a.content) }}

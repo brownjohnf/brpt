@@ -3,8 +3,8 @@ import hljs from "highlight.js";
 import { Marked, type Token, type Tokens } from "marked";
 import { markedHighlight } from "marked-highlight";
 import os from "os";
-import type { AnnotationData, AppConfig, BrptNotification, DiffData, FileData, OpenEntry } from "../shared/types";
-export type { AnnotationData, AppConfig, BrptNotification, DiffData, FileData, OpenEntry };
+import type { Annotation, AppConfig, BrptNotification, DiffData, FileData, OpenEntry, SidecarExtras } from "../shared/types";
+export type { AppConfig, BrptNotification, DiffData, FileData, OpenEntry, SidecarExtras };
 
 export interface MdviewApi {
   renderMarkdown(text: string, startLine?: number): string;
@@ -13,22 +13,21 @@ export interface MdviewApi {
   onFilesFromArgs(callback: (files: FileData[]) => void): () => void;
   onDiffFromArgs(callback: (data: DiffData) => void): () => void;
   onDiffUpdated(callback: (data: DiffData) => void): () => void;
-  onAnnotationsFromArgs(callback: (data: AnnotationData) => void): () => void;
-  onAnnotationsUpdated(callback: (data: AnnotationData) => void): () => void;
+  onAnnotationsUpdated(callback: (data: { targetPath: string; annotations: Annotation[] }) => void): () => void;
   onConfigLoaded(callback: (config: AppConfig) => void): () => void;
   onActivateFile(callback: (path: string) => void): () => void;
   openFileDialog(): Promise<FileData[]>;
   requestFile(filePath: string): Promise<FileData | null>;
   requestDiff(newPath: string, diffPath: string): Promise<DiffData | null>;
   requestDiffByFiles(newPath: string, oldPath: string): Promise<DiffData | null>;
-  requestAnnotations(targetPath: string, annotationPath: string): void;
-  closeFile(filePath: string, annotationPath?: string): void;
+  closeFile(filePath: string): void;
   getConfig(): Promise<AppConfig>;
   setConfig(key: string, value: unknown): void;
   saveOpenFiles(entries: OpenEntry[]): void;
   onNotificationReceived(callback: (data: { targetPath: string; notification: BrptNotification }) => void): () => void;
-  getNotifications(targetPath: string): Promise<BrptNotification[]>;
+  getExtras(targetPath: string): Promise<SidecarExtras>;
   markNotificationsRead(targetPath: string): void;
+  dismissAnnotation(targetPath: string, annotationId: string): void;
   startFileDrag(filePath: string): void;
   homedir: string;
 }
@@ -279,16 +278,8 @@ const api: MdviewApi = {
       ipcRenderer.removeListener("diff-updated", listener);
     };
   },
-  onAnnotationsFromArgs: (callback: (data: AnnotationData) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, data: AnnotationData): void =>
-      callback(data);
-    ipcRenderer.on("annotations-from-args", listener);
-    return () => {
-      ipcRenderer.removeListener("annotations-from-args", listener);
-    };
-  },
-  onAnnotationsUpdated: (callback: (data: AnnotationData) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, data: AnnotationData): void =>
+  onAnnotationsUpdated: (callback: (data: { targetPath: string; annotations: Annotation[] }) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, data: { targetPath: string; annotations: Annotation[] }): void =>
       callback(data);
     ipcRenderer.on("annotations-updated", listener);
     return () => {
@@ -310,10 +301,8 @@ const api: MdviewApi = {
     ipcRenderer.invoke("request-diff", newPath, diffPath),
   requestDiffByFiles: (newPath: string, oldPath: string) =>
     ipcRenderer.invoke("request-diff-by-files", newPath, oldPath),
-  requestAnnotations: (targetPath: string, annotationPath: string) =>
-    ipcRenderer.send("request-annotations", targetPath, annotationPath),
-  closeFile: (filePath: string, annotationPath?: string) =>
-    ipcRenderer.send("close-file", filePath, annotationPath),
+  closeFile: (filePath: string) =>
+    ipcRenderer.send("close-file", filePath),
   getConfig: () => ipcRenderer.invoke("get-config"),
   setConfig: (key: string, value: unknown) =>
     ipcRenderer.send("set-config", key, value),
@@ -335,10 +324,12 @@ const api: MdviewApi = {
       ipcRenderer.removeListener("notification-received", listener);
     };
   },
-  getNotifications: (targetPath: string) =>
-    ipcRenderer.invoke("get-notifications", targetPath),
+  getExtras: (targetPath: string) =>
+    ipcRenderer.invoke("get-extras", targetPath),
   markNotificationsRead: (targetPath: string) =>
     ipcRenderer.send("mark-notifications-read", targetPath),
+  dismissAnnotation: (targetPath: string, annotationId: string) =>
+    ipcRenderer.send("dismiss-annotation", targetPath, annotationId),
   startFileDrag: (filePath: string) =>
     ipcRenderer.send("start-file-drag", filePath),
   homedir: os.homedir(),
