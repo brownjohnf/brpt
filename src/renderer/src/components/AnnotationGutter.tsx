@@ -18,18 +18,11 @@ export interface GutterLine {
   bottom: number;
 }
 
-export interface GutterElement {
-  el: HTMLElement;
-  line: number;
-}
-
-export type FindGutterElements = (contentEl: HTMLElement) => GutterElement[];
-export type ReadGutterPositions = (elements: GutterElement[], gutterEl: HTMLElement) => GutterLine[];
+export type MeasureGutterLines = (contentEl: HTMLElement, gutterEl: HTMLElement) => GutterLine[];
 
 interface AnnotationGutterProps {
   contentEl: HTMLDivElement | null;
-  findElements: FindGutterElements;
-  readPositions: ReadGutterPositions;
+  measureLines: MeasureGutterLines;
   contentKey: unknown;
   annotations: Annotation[] | undefined;
   collapsedInsertionLines?: Set<number>;
@@ -51,8 +44,7 @@ function findLineEntry(lines: GutterLine[], targetLine: number): GutterLine | nu
 
 export function AnnotationGutter({
   contentEl,
-  findElements,
-  readPositions,
+  measureLines,
   contentKey,
   annotations,
   collapsedInsertionLines,
@@ -60,25 +52,18 @@ export function AnnotationGutter({
 }: AnnotationGutterProps): ReactNode {
   const [lines, setLines] = useState<GutterLine[]>([]);
   const gutterRef = useRef<HTMLDivElement>(null);
-  const elementsRef = useRef<GutterElement[]>([]);
-
-  const refreshElements = useCallback(() => {
-    if (!contentEl) { return; }
-    elementsRef.current = findElements(contentEl);
-  }, [contentEl, findElements]);
 
   const measure = useCallback(() => {
     const gutter = gutterRef.current;
-    if (!gutter || elementsRef.current.length === 0) {
+    if (!contentEl || !gutter) {
       return;
     }
-    setLines(readPositions(elementsRef.current, gutter));
-  }, [readPositions]);
+    setLines(measureLines(contentEl, gutter));
+  }, [contentEl, measureLines]);
 
   useLayoutEffect(() => {
-    refreshElements();
     measure();
-  }, [refreshElements, measure, contentKey, annotations]);
+  }, [measure, contentKey, annotations]);
 
   useLayoutEffect(() => {
     measure();

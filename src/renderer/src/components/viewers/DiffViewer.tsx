@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { classNames } from "../../classNames";
 import { annotationInsertionLine } from "../../../../shared/annotations";
 import type { Annotation, DiffTab, ViewerCapabilities } from "../../types";
-import { AnnotationGutter, type GutterElement, type GutterLine } from "../AnnotationGutter";
+import { AnnotationGutter, type GutterLine } from "../AnnotationGutter";
 import { SegmentedControl } from "../ui-elements/SegmentedControl";
 
 const { mdview } = window;
@@ -13,9 +13,10 @@ export function diffCapabilities(tab: DiffTab): ViewerCapabilities {
   return { draggablePath: tab.path };
 }
 
-function findDiffElements(contentEl: HTMLElement): GutterElement[] {
+function measureDiffByFilesLines(contentEl: HTMLElement, gutterEl: HTMLElement): GutterLine[] {
+  const gutterRect = gutterEl.getBoundingClientRect();
   const rows = contentEl.querySelectorAll<HTMLElement>("tr:not(.d2h-info)");
-  const result: GutterElement[] = [];
+  const result: GutterLine[] = [];
   for (const row of rows) {
     const lineNum2 = row.querySelector<HTMLElement>(".line-num2");
     const text = lineNum2?.textContent?.trim();
@@ -26,22 +27,15 @@ function findDiffElements(contentEl: HTMLElement): GutterElement[] {
     if (isNaN(line)) {
       continue;
     }
-    result.push({ el: row, line });
-  }
-  return result;
-}
-
-function readDiffPositions(elements: GutterElement[], gutterEl: HTMLElement): GutterLine[] {
-  const gutterRect = gutterEl.getBoundingClientRect();
-  return elements.map(({ el, line }) => {
-    const rect = el.getBoundingClientRect();
-    return {
+    const rect = row.getBoundingClientRect();
+    result.push({
       line,
       endLine: line,
       top: rect.top - gutterRect.top,
       bottom: rect.bottom - gutterRect.top,
-    };
-  });
+    });
+  }
+  return result;
 }
 
 type DiffViewMode = "line-by-line" | "side-by-side";
@@ -227,8 +221,7 @@ export function DiffContent({ tab, viewMode }: DiffContentProps): ReactNode {
     <div className="flex min-h-full">
       <AnnotationGutter
         contentEl={contentEl}
-        findElements={findDiffElements}
-        readPositions={readDiffPositions}
+        measureLines={measureDiffByFilesLines}
         contentKey={tab.diff}
         annotations={tab.annotations}
         collapsedInsertionLines={collapsedInsertionLines}

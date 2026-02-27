@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode, type RefObje
 import { annotationInsertionLine } from "../../../../shared/annotations";
 import { classNames } from "../../classNames";
 import type { Annotation, ContentWidthConfig, ContentWidthMode, MarkdownTab, ViewerCapabilities } from "../../types";
-import { AnnotationGutter, type GutterElement, type GutterLine } from "../AnnotationGutter";
+import { AnnotationGutter, type GutterLine } from "../AnnotationGutter";
 import { useCurrentHeading } from "../../useCurrentHeading";
 import { SegmentedControl } from "../ui-elements/SegmentedControl";
 
@@ -132,19 +132,18 @@ export function MarkdownTopBarContent({
   );
 }
 
-function findMarkdownElements(contentEl: HTMLElement): GutterElement[] {
-  const allElements = contentEl.querySelectorAll<HTMLElement>("[data-source-line]");
-  return Array.from(allElements)
-    .filter(e => !e.closest(".annotation-block") && !e.querySelector("[data-source-line]"))
-    .map(el => ({ el, line: parseInt(el.dataset.sourceLine!, 10) }));
-}
-
-function readMarkdownPositions(elements: GutterElement[], gutterEl: HTMLElement): GutterLine[] {
+function measureMarkdownLines(contentEl: HTMLElement, gutterEl: HTMLElement): GutterLine[] {
   const gutterRect = gutterEl.getBoundingClientRect();
+  const allElements = contentEl.querySelectorAll<HTMLElement>("[data-source-line]");
+  const elements = Array.from(allElements).filter(e =>
+    !e.closest(".annotation-block") &&
+    !e.querySelector("[data-source-line]")
+  );
   const byLine = new Map<number, { line: number; top: number; bottom: number }>();
 
-  for (const { el, line } of elements) {
-    const rect = el.getBoundingClientRect();
+  for (const element of elements) {
+    const line = parseInt(element.dataset.sourceLine!, 10);
+    const rect = element.getBoundingClientRect();
     byLine.set(line, {
       line,
       top: rect.top - gutterRect.top,
@@ -291,8 +290,7 @@ export function MarkdownContent({
       <div className="flex min-h-full">
         <AnnotationGutter
           contentEl={contentEl}
-          findElements={findMarkdownElements}
-          readPositions={readMarkdownPositions}
+          measureLines={measureMarkdownLines}
           contentKey={tab.content}
           annotations={tab.annotations}
           collapsedInsertionLines={collapsedInsertionLines}
