@@ -202,9 +202,12 @@ export function tabsReducer(state: TabsState, action: TabsAction): TabsState {
         return state;
       }
       const tabs = [...state.tabs];
+      const existing = tabs[index].annotations?.length ?? 0;
+      const grew = action.annotations.length > existing;
       tabs[index] = {
         ...tabs[index],
         annotations: action.annotations,
+        hasUnseenChanges: grew ? index !== state.activeIndex : tabs[index].hasUnseenChanges,
       };
       return { tabs, activeIndex: state.activeIndex };
     }

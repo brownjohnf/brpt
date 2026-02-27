@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 import type { ProjectEntry } from "../../../shared/types";
 import { classNames } from "../classNames";
 import { groupTabs } from "../groupTabs";
@@ -156,6 +156,31 @@ export function Sidebar({
   const [dragOver, setDragOver] = useState(false);
   const dragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollUp, setCanScrollUp] = useState(false);
+  const [canScrollDown, setCanScrollDown] = useState(false);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) {
+      return;
+    }
+    function update(): void {
+      if (!el) {
+        return;
+      }
+      setCanScrollUp(el.scrollTop > 0);
+      setCanScrollDown(el.scrollTop + el.clientHeight < el.scrollHeight - 1);
+    }
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => {
+      el.removeEventListener("scroll", update);
+      observer.disconnect();
+    };
+  }, []);
 
   const { grouped, ungrouped } = useMemo(
     () => groupTabs(tabs, projects, containerFolders, groupOrder),
@@ -249,7 +274,15 @@ export function Sidebar({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        <div className="flex-1 overflow-y-auto p-2">
+        <div
+          ref={scrollRef}
+          className={classNames(
+            "flex-1 overflow-y-auto p-2",
+            "sidebar-scroll",
+            canScrollUp && "sidebar-scroll--top",
+            canScrollDown && "sidebar-scroll--bottom",
+          )}
+        >
           {grouped.map((group) => (
             <GroupContainer
               key={group.name}

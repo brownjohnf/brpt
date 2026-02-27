@@ -66,6 +66,34 @@ body[data-theme="dark"] {
   scrollbar-width: thin;
 }
 
+.sidebar-scroll--top {
+  box-shadow: inset 0 8px 6px -6px rgba(0, 0, 0, 0.15);
+}
+
+.sidebar-scroll--bottom {
+  box-shadow: inset 0 -8px 6px -6px rgba(0, 0, 0, 0.15);
+}
+
+.sidebar-scroll--top.sidebar-scroll--bottom {
+  box-shadow:
+    inset 0 8px 6px -6px rgba(0, 0, 0, 0.15),
+    inset 0 -8px 6px -6px rgba(0, 0, 0, 0.15);
+}
+
+body[data-theme="dark"] .sidebar-scroll--top {
+  box-shadow: inset 0 8px 6px -6px rgba(0, 0, 0, 0.4);
+}
+
+body[data-theme="dark"] .sidebar-scroll--bottom {
+  box-shadow: inset 0 -8px 6px -6px rgba(0, 0, 0, 0.4);
+}
+
+body[data-theme="dark"] .sidebar-scroll--top.sidebar-scroll--bottom {
+  box-shadow:
+    inset 0 8px 6px -6px rgba(0, 0, 0, 0.4),
+    inset 0 -8px 6px -6px rgba(0, 0, 0, 0.4);
+}
+
 .markdown-body {
   background: transparent !important;
 }
