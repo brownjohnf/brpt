@@ -132,22 +132,39 @@ export function MarkdownTopBarContent({
   );
 }
 
+export function resolveMarkdownLineNumber(node: Node): number | null {
+  const el = node instanceof HTMLElement ? node : node.parentElement;
+  const sourceLine = el?.closest("[data-source-line]");
+  if (!sourceLine) { return null; }
+  const line = parseInt((sourceLine as HTMLElement).dataset.sourceLine!, 10);
+  return isNaN(line) ? null : line;
+}
+
 function measureMarkdownLines(contentEl: HTMLElement, gutterEl: HTMLElement): GutterLine[] {
   const gutterRect = gutterEl.getBoundingClientRect();
   const allElements = contentEl.querySelectorAll<HTMLElement>("[data-source-line]");
   const elements = Array.from(allElements).filter(e =>
-    !e.closest(".annotation-block") &&
-    !e.querySelector("[data-source-line]")
+    !e.closest(".annotation-block")
   );
   const byLine = new Map<number, { line: number; top: number; bottom: number }>();
 
   for (const element of elements) {
     const line = parseInt(element.dataset.sourceLine!, 10);
     const rect = element.getBoundingClientRect();
+    let bottom = rect.bottom;
+
+    // If this element contains children with data-source-line, clip its height
+    // to just its own content (before the first child). Otherwise the gutter
+    // entry would span the entire nested content.
+    const firstChild = element.querySelector("[data-source-line]");
+    if (firstChild) {
+      bottom = firstChild.getBoundingClientRect().top;
+    }
+
     byLine.set(line, {
       line,
       top: rect.top - gutterRect.top,
-      bottom: rect.bottom - gutterRect.top,
+      bottom: bottom - gutterRect.top,
     });
   }
 
@@ -163,6 +180,8 @@ function measureMarkdownLines(contentEl: HTMLElement, gutterEl: HTMLElement): Gu
 interface MarkdownContentProps {
   tab: MarkdownTab;
   contentWidth: ContentWidthConfig;
+  contentElRef: (el: HTMLDivElement | null) => void;
+  findMatchLines?: Set<number>;
 }
 
 interface AnnotatedChunk {
@@ -237,9 +256,16 @@ function buildAnnotatedChunks(content: string, annotations: Annotation[]): Annot
 export function MarkdownContent({
   tab,
   contentWidth,
+  contentElRef,
+  findMatchLines,
 }: MarkdownContentProps): ReactNode {
   const hasAnnotations = tab.annotations && tab.annotations.length > 0;
   const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null);
+
+  const combinedRef = useCallback((el: HTMLDivElement | null) => {
+    setContentEl(el);
+    contentElRef(el);
+  }, [contentElRef]);
   const [collapsedInsertionLines, setCollapsedInsertionLines] = useState<Set<number>>(new Set());
 
   const handleDotClick = useCallback((insertionLines: number[]) => {
@@ -295,8 +321,9 @@ export function MarkdownContent({
           annotations={tab.annotations}
           collapsedInsertionLines={collapsedInsertionLines}
           onDotClick={handleDotClick}
+          findMatchLines={findMatchLines}
         />
-        <div ref={setContentEl} className="flex-1 min-w-0 pl-8">
+        <div ref={combinedRef} className="flex-1 min-w-0 pl-8">
           <div className="mx-auto" style={contentStyle}>
           {annotatedChunks ? (
             annotatedChunks.map((chunk, i) => (

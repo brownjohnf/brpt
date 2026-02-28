@@ -94,6 +94,22 @@ body[data-theme="dark"] .sidebar-scroll--top.sidebar-scroll--bottom {
     inset 0 -8px 6px -6px rgba(0, 0, 0, 0.4);
 }
 
+::highlight(search-results) {
+  background-color: rgba(245, 158, 11, 0.2);
+}
+
+::highlight(search-active) {
+  background-color: rgba(245, 158, 11, 0.45);
+}
+
+body[data-theme="dark"] ::highlight(search-results) {
+  background-color: rgba(245, 158, 11, 0.18);
+}
+
+body[data-theme="dark"] ::highlight(search-active) {
+  background-color: rgba(245, 158, 11, 0.4);
+}
+
 .markdown-body {
   background: transparent !important;
 }
@@ -207,6 +223,23 @@ body[data-theme="dark"] .sidebar-scroll--top.sidebar-scroll--bottom {
 
 .gutter-annotation-dot--collapsed {
   opacity: 0.35;
+}
+
+.gutter-line-entry--find-match .gutter-line-number {
+  color: var(--tab-active-text);
+  font-weight: 600;
+}
+
+.gutter-line-entry--find-match::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(245, 158, 11, 0.15);
+  pointer-events: none;
+}
+
+body[data-theme="dark"] .gutter-line-entry--find-match::before {
+  background: rgba(245, 158, 11, 0.12);
 }
 
 .gutter-annotation-range-line {

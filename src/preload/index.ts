@@ -71,6 +71,7 @@ function assignLineNumbers(tokens: Token[], startLine: number = 1): void {
       let itemLine = line;
       for (const item of listToken.items) {
         (item as unknown as Record<string, unknown>)._line = itemLine;
+        assignLineNumbers(item.tokens, itemLine);
         itemLine += item.raw.split("\n").length - 1;
       }
     }

@@ -27,6 +27,7 @@ interface AnnotationGutterProps {
   annotations: Annotation[] | undefined;
   collapsedInsertionLines?: Set<number>;
   onDotClick?: (insertionLines: number[]) => void;
+  findMatchLines?: Set<number>;
 }
 
 function findLineEntry(lines: GutterLine[], targetLine: number): GutterLine | null {
@@ -49,6 +50,7 @@ export function AnnotationGutter({
   annotations,
   collapsedInsertionLines,
   onDotClick,
+  findMatchLines,
 }: AnnotationGutterProps): ReactNode {
   const [lines, setLines] = useState<GutterLine[]>([]);
   const gutterRef = useRef<HTMLDivElement>(null);
@@ -171,12 +173,15 @@ export function AnnotationGutter({
           collapsedInsertionLines != null &&
           insertionLines.every((il) => collapsedInsertionLines.has(il));
 
+        const hasFindMatch = findMatchLines != null && findMatchLines.has(l.line);
+
         return (
           <div
             key={l.line}
             className={classNames(
               "gutter-line-entry",
               hasDot && "gutter-line-entry--clickable",
+              hasFindMatch && "gutter-line-entry--find-match",
             )}
             style={{ top: l.top, height: l.bottom - l.top }}
             onClick={hasDot && insertionLines && onDotClick

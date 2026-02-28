@@ -6,17 +6,21 @@ import { QuickGoto } from "./components/QuickGoto";
 import { Sidebar } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
 import { DrawerToggle, SidebarToggle, TopBar } from "./components/TopBar";
+import { FindBar } from "./components/FindBar";
 import {
   DiffContent,
   DiffTopBarContent,
   diffCapabilities,
+  resolveDiffLineNumber,
   useDiffViewMode,
 } from "./components/viewers/DiffViewer";
 import {
   MarkdownContent,
   MarkdownTopBarContent,
   markdownCapabilities,
+  resolveMarkdownLineNumber,
 } from "./components/viewers/MarkdownViewer";
+import { useDocumentSearch } from "./hooks/useDocumentSearch";
 import { initialTabsState, tabsReducer } from "./tabsReducer";
 import type {
   AppConfig,
@@ -51,6 +55,8 @@ export default function App(): ReactNode {
   const [sidebarWidth, setSidebarWidth] = useState(270);
   const [quickGotoOpen, setQuickGotoOpen] = useState(false);
   const [quickGotoHighlight, setQuickGotoHighlight] = useState<number | null>(null);
+  const [findOpen, setFindOpen] = useState(false);
+  const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null);
 
   const mruTabs = useMemo(() => {
     return tabs
@@ -77,6 +83,15 @@ export default function App(): ReactNode {
     if (activeTab.kind === "diff") { return diffCapabilities(activeTab); }
     return {};
   }, [activeTab]);
+
+  const resolveLineNumber = useMemo(() => {
+    if (!activeTab) { return null; }
+    if (activeTab.kind === "markdown") { return resolveMarkdownLineNumber; }
+    if (activeTab.kind === "diff") { return resolveDiffLineNumber; }
+    return null;
+  }, [activeTab]);
+
+  const documentSearch = useDocumentSearch(contentEl, resolveLineNumber);
 
   const [diffViewMode, setDiffViewMode] = useDiffViewMode();
 
@@ -485,6 +500,11 @@ export default function App(): ReactNode {
         setQuickGotoOpen((prev) => !prev);
         return;
       }
+      if (mod && e.key === "f") {
+        e.preventDefault();
+        setFindOpen(true);
+        return;
+      }
       if (mod && e.shiftKey && e.key === "[") {
         e.preventDefault();
         const target = adjacentVisualTab(-1);
@@ -514,7 +534,15 @@ export default function App(): ReactNode {
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [activeIndex, tabs, projects, containerFolders, groupOrder, closeTab, handleOpenDialog, activateTab, openFile, quickGotoOpen]);
+  }, [activeIndex, tabs, projects, containerFolders, groupOrder, closeTab, handleOpenDialog, activateTab, openFile, quickGotoOpen, findOpen]);
+
+  useEffect(() => {
+    if (findOpen) {
+      setFindOpen(false);
+      documentSearch.clear();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeIndex]);
 
   // Apply theme to document and toggle stylesheets
   useThemeStyles(theme);
@@ -612,12 +640,16 @@ export default function App(): ReactNode {
                 <MarkdownContent
                   tab={activeTab}
                   contentWidth={contentWidth}
+                  contentElRef={setContentEl}
+                  findMatchLines={documentSearch.state.matchLineNumbers}
                 />
               )}
               {activeTab?.kind === "diff" && (
                 <DiffContent
                   tab={activeTab}
                   viewMode={diffViewMode}
+                  contentElRef={setContentEl}
+                  findMatchLines={documentSearch.state.matchLineNumbers}
                 />
               )}
             </ContentArea>
@@ -643,6 +675,15 @@ export default function App(): ReactNode {
           onActivateTab={activateTab}
           onHighlight={setQuickGotoHighlight}
           onClose={() => setQuickGotoOpen(false)}
+        />
+      )}
+      {findOpen && (
+        <FindBar
+          search={documentSearch}
+          onClose={() => {
+            documentSearch.clear();
+            setFindOpen(false);
+          }}
         />
       )}
     </>

@@ -1,6 +1,7 @@
 import "diff2html/bundles/css/diff2html.min.css";
 import { html } from "diff2html";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
+
 import { classNames } from "../../classNames";
 import { annotationInsertionLine } from "../../../../shared/annotations";
 import type { Annotation, DiffTab, ViewerCapabilities } from "../../types";
@@ -8,6 +9,17 @@ import { AnnotationGutter, type GutterLine } from "../AnnotationGutter";
 import { SegmentedControl } from "../ui-elements/SegmentedControl";
 
 const { mdview } = window;
+
+export function resolveDiffLineNumber(node: Node): number | null {
+  const el = node instanceof HTMLElement ? node : node.parentElement;
+  const row = el?.closest("tr");
+  if (!row) { return null; }
+  const lineNum2 = row.querySelector<HTMLElement>(".line-num2");
+  const text = lineNum2?.textContent?.trim();
+  if (!text) { return null; }
+  const line = parseInt(text, 10);
+  return isNaN(line) ? null : line;
+}
 
 export function diffCapabilities(tab: DiffTab): ViewerCapabilities {
   return { draggablePath: tab.path };
@@ -48,6 +60,8 @@ const viewModeOptions: { value: DiffViewMode; label: string }[] = [
 interface DiffContentProps {
   tab: DiffTab;
   viewMode: DiffViewMode;
+  contentElRef: (el: HTMLDivElement | null) => void;
+  findMatchLines?: Set<number>;
 }
 
 /**
@@ -178,9 +192,14 @@ function buildDiffAnnotatedChunks(
   return chunks;
 }
 
-export function DiffContent({ tab, viewMode }: DiffContentProps): ReactNode {
+export function DiffContent({ tab, viewMode, contentElRef, findMatchLines }: DiffContentProps): ReactNode {
   const hasAnnotations = tab.annotations && tab.annotations.length > 0;
   const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null);
+
+  const combinedRef = useCallback((el: HTMLDivElement | null) => {
+    setContentEl(el);
+    contentElRef(el);
+  }, [contentElRef]);
   const [collapsedInsertionLines, setCollapsedInsertionLines] = useState<Set<number>>(new Set());
 
   const handleDotClick = useCallback((insertionLines: number[]) => {
@@ -226,9 +245,10 @@ export function DiffContent({ tab, viewMode }: DiffContentProps): ReactNode {
         annotations={tab.annotations}
         collapsedInsertionLines={collapsedInsertionLines}
         onDotClick={handleDotClick}
+        findMatchLines={findMatchLines}
       />
       <div
-        ref={setContentEl}
+        ref={combinedRef}
         className={classNames(
           "diff-viewer flex-1 min-w-0 pl-8",
           annotatedChunks ? "d2h-unified" : (viewMode === "side-by-side" ? "d2h-side-by-side" : "d2h-unified"),
