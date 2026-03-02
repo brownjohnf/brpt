@@ -1153,6 +1153,7 @@ if (!gotTheLock) {
       if (mainWindow.isMinimized()) {
         mainWindow.restore();
       }
+      app.focus({ steal: true });
       mainWindow.focus();
     }
   });
