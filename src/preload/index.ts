@@ -177,6 +177,16 @@ const lineRenderer = {
   paragraph(this: { parser: { parseInline(tokens: Token[]): string } }, token: Tokens.Paragraph & { _line?: number }) {
     return injectLineAttr(`<p>${this.parser.parseInline(token.tokens)}</p>\n`, token._line);
   },
+  html(token: Tokens.HTML & { _line?: number }) {
+    const isClosingTag = /^\s*<\/[a-zA-Z]/.test(token.text);
+    if (token._line != null && !isClosingTag) {
+      return `<div class="html-block" data-source-line="${token._line}"><div class="html-block-label">&lt;html&gt;</div><div class="html-block-content">${token.text}</div><div class="html-block-label">&lt;/html&gt;</div></div>`;
+    }
+    if (token._line != null) {
+      return `<div data-source-line="${token._line}">${token.text}</div>`;
+    }
+    return token.text;
+  },
   table(this: { parser: { parseInline(tokens: Token[]): string } }, token: Tokens.Table & { _line?: number; _headerLine?: number; _rowLines?: number[] }) {
     let header = "";
     let cell = "";

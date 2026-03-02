@@ -118,6 +118,32 @@ body[data-theme="dark"] ::highlight(search-active) {
   background: transparent !important;
 }
 
+.markdown-body .html-block {
+  border: 1px solid var(--sidebar-border);
+  border-radius: 6px;
+  background: var(--tab-hover-bg);
+  padding: 4px 0;
+  margin: 16px 0;
+}
+
+.html-block-label {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--status-text);
+  opacity: 0.5;
+  user-select: none;
+  padding: 2px 0;
+}
+
+.markdown-body .html-block-content {
+  background: #ffffff;
+  overflow: hidden;
+}
+
+body[data-theme="dark"] .markdown-body .html-block-content {
+  background: #0d1117;
+}
+
 .notification-content .markdown-body pre {
   background-color: var(--sidebar-bg) !important;
 }
@@ -244,6 +270,18 @@ body[data-theme="dark"] ::highlight(search-active) {
 
 body[data-theme="dark"] .gutter-line-entry--find-match::before {
   background: rgba(245, 158, 11, 0.12);
+}
+
+.gutter-line-entry--html-block::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(139, 92, 246, 0.12);
+  pointer-events: none;
+}
+
+body[data-theme="dark"] .gutter-line-entry--html-block::before {
+  background: rgba(167, 139, 250, 0.1);
 }
 
 .gutter-annotation-range-line {

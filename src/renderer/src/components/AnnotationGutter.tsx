@@ -16,6 +16,7 @@ export interface GutterLine {
   endLine: number;
   top: number;
   bottom: number;
+  htmlBlock?: boolean;
 }
 
 export type MeasureGutterLines = (contentEl: HTMLElement, gutterEl: HTMLElement) => GutterLine[];
@@ -182,6 +183,7 @@ export function AnnotationGutter({
               "gutter-line-entry",
               hasDot && "gutter-line-entry--clickable",
               hasFindMatch && "gutter-line-entry--find-match",
+              l.htmlBlock && "gutter-line-entry--html-block",
             )}
             style={{ top: l.top, height: l.bottom - l.top }}
             onClick={hasDot && insertionLines && onDotClick

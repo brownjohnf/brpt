@@ -165,6 +165,7 @@ function measureMarkdownLines(contentEl: HTMLElement, gutterEl: HTMLElement): Gu
       line,
       top: rect.top - gutterRect.top,
       bottom: bottom - gutterRect.top,
+      htmlBlock: element.classList.contains("html-block"),
     });
   }
 
