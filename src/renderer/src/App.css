@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @source "./**/*.tsx";
 
+:root {
+  --top-bar-height: 30px;
+}
+
 html,
 body,
 #root {

@@ -135,6 +135,34 @@ function GroupContainer({
   );
 }
 
+function ActiveTabLabel({ tab, groupRootPath }: { tab: Tab | null; groupRootPath?: string }): ReactNode {
+  if (!tab) { return null; }
+  const filename = tab.path.split("/").pop() || tab.path;
+  let prefix: string | null = null;
+  if (groupRootPath && tab.path.startsWith(groupRootPath + "/")) {
+    const relative = tab.path.slice(groupRootPath.length + 1);
+    const parts = relative.split("/");
+    prefix = parts.length > 1 ? parts.slice(0, -1).join("/") + "/" : null;
+  }
+  return (
+    <div
+      className="px-2 shrink-0 border-b border-[var(--sidebar-border)] text-[11px] font-medium flex items-center min-w-0"
+      style={{ height: "var(--top-bar-height)" }}
+      title={tab.path}
+    >
+      <span
+        className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-right [direction:rtl]"
+        style={prefix ? { color: "var(--sidebar-border)" } : undefined}
+      >
+        <bdo dir="ltr">
+          {prefix && <span>{prefix}</span>}
+          <span style={{ color: "var(--tab-active-text)" }}>{filename}</span>
+        </bdo>
+      </span>
+    </div>
+  );
+}
+
 export function Sidebar({
   tabs,
   activeIndex,
@@ -194,6 +222,17 @@ export function Sidebar({
     }),
     {} as Record<string, boolean>
   );
+
+  const activeTab = activeIndex >= 0 && activeIndex < tabs.length ? tabs[activeIndex] : null;
+  const activeGroupRootPath = useMemo(() => {
+    if (!activeTab) { return undefined; }
+    for (const group of grouped) {
+      if (group.tabs.some(t => t.index === activeIndex)) {
+        return group.rootPath;
+      }
+    }
+    return undefined;
+  }, [activeTab, activeIndex, grouped]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     if (
@@ -274,6 +313,7 @@ export function Sidebar({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
+        <ActiveTabLabel tab={activeTab} groupRootPath={activeGroupRootPath} />
         <div
           ref={scrollRef}
           className={classNames(

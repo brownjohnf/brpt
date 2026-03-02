@@ -10,12 +10,15 @@ interface TopBarProps {
 export function TopBar({ children, left, right, hasUnreadNotifications }: TopBarProps): ReactNode {
   return (
     <div
-      className={`flex items-center justify-between gap-2 px-4 py-1 shrink-0 border-b transition-colors duration-300 ${
+      className={`flex items-center justify-between gap-2 px-4 shrink-0 border-b transition-colors duration-300 ${
         hasUnreadNotifications
           ? "bg-[var(--status-glow)]/15 border-[var(--status-glow)]/30"
           : "border-[var(--sidebar-border)]"
       }`}
-      style={hasUnreadNotifications ? undefined : { background: "var(--sidebar-bg)" }}
+      style={{
+        height: "var(--top-bar-height)",
+        ...(hasUnreadNotifications ? {} : { background: "var(--sidebar-bg)" }),
+      }}
     >
       {left}
       <div className="flex items-center justify-between gap-2 flex-1 min-w-0">
