@@ -415,6 +415,11 @@ MODES
     Opens one or more files as tabs. Each file is watched for changes
     and the preview updates automatically. Any text file works, though
     markdown files get full rendering with syntax-highlighted code blocks.
+    Raw HTML is supported inside markdown files — HTML blocks are
+    rendered with a visual wrapper to distinguish them from markdown
+    content. Note: embedded HTML blocks cannot contain blank lines,
+    as the markdown parser treats blank lines as the end of the HTML
+    block.
 
   Diff from a unified diff file:
 
