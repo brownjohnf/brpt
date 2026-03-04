@@ -24,6 +24,8 @@ interface SidebarProps {
   onResize: (width: number) => void;
   onReorderTab: (fromIndex: number, toIndex: number) => void;
   onReorderGroup: (fromName: string, toName: string) => void;
+  onPruneTabs: () => void;
+  pruneKeepCount: number;
 }
 
 const MIN_WIDTH = 120;
@@ -146,8 +148,7 @@ function ActiveTabLabel({ tab, groupRootPath }: { tab: Tab | null; groupRootPath
   }
   return (
     <div
-      className="px-2 shrink-0 border-b border-[var(--sidebar-border)] text-[11px] font-medium flex items-center min-w-0"
-      style={{ height: "var(--top-bar-height)" }}
+      className="px-2 flex-1 text-[11px] font-medium flex items-center min-w-0"
       title={tab.path}
     >
       <span
@@ -180,6 +181,8 @@ export function Sidebar({
   onResize,
   onReorderTab,
   onReorderGroup,
+  onPruneTabs,
+  pruneKeepCount,
 }: SidebarProps): ReactNode {
   const [dragOver, setDragOver] = useState(false);
   const dragging = useRef(false);
@@ -313,7 +316,20 @@ export function Sidebar({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        <ActiveTabLabel tab={activeTab} groupRootPath={activeGroupRootPath} />
+        <div className="flex items-center shrink-0 border-b border-[var(--sidebar-border)]" style={{ height: "var(--top-bar-height)" }}>
+          <button
+            onClick={onPruneTabs}
+            title={`Close all except ${pruneKeepCount} most recent tabs`}
+            className={classNames(
+              "bg-transparent border-none text-[var(--btn-text)] cursor-pointer",
+              "text-xs px-1.5 shrink-0 rounded flex items-center gap-0.5",
+              "hover:bg-[var(--btn-hover-bg)] opacity-60 hover:opacity-100"
+            )}
+          >
+            ✂<span className="text-[10px]">{pruneKeepCount}</span>
+          </button>
+          <ActiveTabLabel tab={activeTab} groupRootPath={activeGroupRootPath} />
+        </div>
         <div
           ref={scrollRef}
           className={classNames(

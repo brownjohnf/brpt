@@ -21,7 +21,6 @@ import type {
 
 const DEFAULT_CONFIG: AppConfig = {
   theme: "light",
-  openFiles: [],
   containerFolders: [],
   contentWidth: {
     mode: "fixed",
@@ -69,11 +68,37 @@ function saveConfig(config: AppConfig): void {
 }
 
 function loadStore(): Store {
+  let store: Store;
   try {
-    return JSON.parse(fs.readFileSync(STORE_PATH, "utf-8"));
+    store = JSON.parse(fs.readFileSync(STORE_PATH, "utf-8"));
   } catch {
-    return { tabActivations: {} };
+    store = { tabActivations: {}, openFiles: [] };
   }
+
+  // Migrate openFiles/activeFile from config into store (one-time)
+  if (!store.openFiles) {
+    const config = loadConfig();
+    const legacy = config as unknown as Record<string, unknown>;
+    store.openFiles = (legacy.openFiles as OpenEntry[] | undefined) ?? [];
+    if (legacy.activeFile != null) {
+      store.activeFile = legacy.activeFile as string;
+    }
+
+    // Write store immediately (not debounced) so the migration persists
+    try {
+      fs.mkdirSync(dirname(STORE_PATH), { recursive: true });
+      fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
+    } catch (err) {
+      console.error(`Failed to save store during migration:`, err);
+    }
+
+    // Remove migrated fields from config
+    delete legacy.openFiles;
+    delete legacy.activeFile;
+    saveConfig(config);
+  }
+
+  return store;
 }
 
 let storeWriteTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1075,14 +1100,15 @@ function createWindow(): void {
     const config = loadConfig();
     mainWindow.webContents.send("config-loaded", config);
 
-    const sessionEntries = config.openFiles || [];
+    const store = loadStore();
+    const sessionEntries = store.openFiles || [];
 
     // Always restore the session
     restoreSessionEntries(sessionEntries);
 
     // Restore the previously active tab
-    if (config.activeFile) {
-      mainWindow.webContents.send("activate-file", config.activeFile);
+    if (store.activeFile) {
+      mainWindow.webContents.send("activate-file", store.activeFile);
     }
 
     // CLI args open on top of the session
@@ -1294,9 +1320,15 @@ ipcMain.on("set-config", (_event, key: string, value: unknown) => {
 });
 
 ipcMain.on("save-open-files", (_event, entries: OpenEntry[]) => {
-  const config = loadConfig();
-  config.openFiles = entries;
-  saveConfig(config);
+  const store = loadStore();
+  store.openFiles = entries;
+  saveStore(store);
+});
+
+ipcMain.on("save-active-file", (_event, path: string) => {
+  const store = loadStore();
+  store.activeFile = path;
+  saveStore(store);
 });
 
 ipcMain.handle("get-extras", (_event, targetPath: string) => {

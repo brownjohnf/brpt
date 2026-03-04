@@ -24,6 +24,7 @@ export interface MdviewApi {
   getConfig(): Promise<AppConfig>;
   setConfig(key: string, value: unknown): void;
   saveOpenFiles(entries: OpenEntry[]): void;
+  saveActiveFile(path: string): void;
   onNotificationReceived(callback: (data: { targetPath: string; notification: BrptNotification }) => void): () => void;
   getExtras(targetPath: string): Promise<SidecarExtras>;
   markNotificationsRead(targetPath: string): void;
@@ -177,7 +178,7 @@ const lineRenderer = {
   paragraph(this: { parser: { parseInline(tokens: Token[]): string } }, token: Tokens.Paragraph & { _line?: number }) {
     return injectLineAttr(`<p>${this.parser.parseInline(token.tokens)}</p>\n`, token._line);
   },
-  html(token: Tokens.HTML & { _line?: number }) {
+  html(token: (Tokens.HTML | Tokens.Tag) & { _line?: number }) {
     const isClosingTag = /^\s*<\/[a-zA-Z]/.test(token.text);
     if (token._line != null && !isClosingTag) {
       return `<div class="html-block" data-source-line="${token._line}"><div class="html-block-label">&lt;html&gt;</div><div class="html-block-content">${token.text}</div><div class="html-block-label">&lt;/html&gt;</div></div>`;
@@ -321,6 +322,8 @@ const api: MdviewApi = {
     ipcRenderer.send("set-config", key, value),
   saveOpenFiles: (entries: OpenEntry[]) =>
     ipcRenderer.send("save-open-files", entries),
+  saveActiveFile: (path: string) =>
+    ipcRenderer.send("save-active-file", path),
   onActivateFile: (callback: (path: string) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, path: string): void =>
       callback(path);

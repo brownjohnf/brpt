@@ -67,6 +67,7 @@ export default function App(): ReactNode {
       )
       .slice(0, 5);
   }, [tabs, activeIndex]);
+  const [pruneKeepCount, setPruneKeepCount] = useState(25);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerWidth, setDrawerWidth] = useState(DEFAULT_DRAWER_WIDTH);
@@ -127,6 +128,10 @@ export default function App(): ReactNode {
     },
     [tabs],
   );
+
+  const pruneTabs = useCallback(() => {
+    dispatch({ type: "PRUNE_TABS", keepCount: pruneKeepCount });
+  }, [pruneKeepCount]);
 
   const activateTab = useCallback(
     (index: number) => {
@@ -335,10 +340,10 @@ export default function App(): ReactNode {
     }
   }, [drawerOpen, activeTab?.path]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Persist active file to config
+  // Persist active file to store
   useEffect(() => {
     if (configLoaded.current && activeTab) {
-      mdview.setConfig("activeFile", activeTab.path);
+      mdview.saveActiveFile(activeTab.path);
     }
   }, [activeTab?.path]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -351,6 +356,7 @@ export default function App(): ReactNode {
     if (config.contentWidth) { setContentWidth((prev) => ({ ...prev, ...config.contentWidth })); }
     if (config.sidebarWidth != null) { setSidebarWidth(config.sidebarWidth); }
     if (config.drawerWidth != null) { setDrawerWidth(config.drawerWidth); }
+    if (config.pruneKeepCount != null) { setPruneKeepCount(config.pruneKeepCount); }
     mdview.getStore().then((store) => {
       dispatch({ type: "HYDRATE_ACTIVATIONS", tabActivations: store.tabActivations });
     });
@@ -574,6 +580,8 @@ export default function App(): ReactNode {
           onResize={handleSidebarResize}
           onReorderTab={reorderTab}
           onReorderGroup={reorderGroup}
+          onPruneTabs={pruneTabs}
+          pruneKeepCount={pruneKeepCount}
         />
         <div className="flex-1 flex flex-col overflow-hidden">
           <TopBar

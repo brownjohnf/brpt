@@ -19,7 +19,8 @@ export type TabsAction =
   | { type: "SET_NOTIFICATIONS"; path: string; notifications: BrptNotification[] }
   | { type: "ADD_NOTIFICATION"; path: string; notification: BrptNotification }
   | { type: "MARK_NOTIFICATIONS_READ"; path: string }
-  | { type: "HYDRATE_ACTIVATIONS"; tabActivations: Record<string, string> };
+  | { type: "HYDRATE_ACTIVATIONS"; tabActivations: Record<string, string> }
+  | { type: "PRUNE_TABS"; keepCount: number };
 
 export const initialTabsState: TabsState = {
   tabs: [],
@@ -278,6 +279,44 @@ export function tabsReducer(state: TabsState, action: TabsAction): TabsState {
         return { ...tab, lastActivatedAt: Temporal.Instant.from(iso) };
       });
       return { tabs, activeIndex: state.activeIndex };
+    }
+
+    case "PRUNE_TABS": {
+      const { keepCount } = action;
+      if (state.tabs.length <= keepCount) {
+        return state;
+      }
+
+      const activeTab = state.activeIndex >= 0 ? state.tabs[state.activeIndex] : null;
+
+      // Rank tabs by lastActivatedAt descending; tabs without it sort to the end
+      const ranked = state.tabs
+        .map((tab, index) => ({ tab, index }))
+        .sort((a, b) => {
+          if (a.tab.lastActivatedAt && b.tab.lastActivatedAt) {
+            return Temporal.Instant.compare(b.tab.lastActivatedAt, a.tab.lastActivatedAt);
+          }
+          if (a.tab.lastActivatedAt) { return -1; }
+          if (b.tab.lastActivatedAt) { return 1; }
+          return 0;
+        });
+
+      const kept = new Set<number>();
+      for (const { index } of ranked) {
+        if (kept.size >= keepCount) { break; }
+        kept.add(index);
+      }
+
+      // Always keep the active tab
+      if (activeTab != null && state.activeIndex >= 0) {
+        kept.add(state.activeIndex);
+      }
+
+      // Preserve original tab order
+      const tabs = state.tabs.filter((_, i) => kept.has(i));
+      const activeIndex = activeTab ? tabs.indexOf(activeTab) : -1;
+
+      return { tabs, activeIndex };
     }
   }
 }

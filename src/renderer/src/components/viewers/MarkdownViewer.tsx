@@ -146,7 +146,7 @@ function measureMarkdownLines(contentEl: HTMLElement, gutterEl: HTMLElement): Gu
   const elements = Array.from(allElements).filter(e =>
     !e.closest(".annotation-block")
   );
-  const byLine = new Map<number, { line: number; top: number; bottom: number }>();
+  const byLine = new Map<number, { line: number; top: number; bottom: number; htmlBlock: boolean }>();
 
   for (const element of elements) {
     const line = parseInt(element.dataset.sourceLine!, 10);

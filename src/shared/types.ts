@@ -1,5 +1,7 @@
 export interface Store {
   tabActivations: Record<string, string>;
+  openFiles: OpenEntry[];
+  activeFile?: string;
 }
 
 export type ContentWidthMode = "fixed" | "capped" | "full";
@@ -55,16 +57,15 @@ export type ProjectEntry = string | { path: string; alias?: string };
 
 export interface AppConfig {
   theme: "light" | "dark";
-  openFiles: OpenEntry[];
   containerFolders: string[];
   projects?: ProjectEntry[];
-  activeFile?: string;
   groupOrder?: string[];
   contentWidth: ContentWidthConfig;
   brpt_development_roots?: string[];
   windowBounds?: WindowBounds;
   sidebarWidth?: number;
   drawerWidth?: number;
+  pruneKeepCount?: number;
 }
 
 export interface FileData {
