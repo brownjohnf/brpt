@@ -558,7 +558,7 @@ export default function App(): ReactNode {
         }
         return;
       }
-      if (mod && !e.shiftKey && e.key >= "1" && e.key <= "9" && !quickGotoOpen) {
+      if ((mod || e.altKey) && !e.shiftKey && e.key >= "1" && e.key <= "9" && !quickGotoOpen) {
         e.preventDefault();
         const target = e.key === "9"
           ? lastVisualTab()
