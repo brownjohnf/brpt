@@ -67,7 +67,7 @@ export default function App(): ReactNode {
       )
       .slice(0, 5);
   }, [tabs, activeIndex]);
-  const [pruneKeepCount, setPruneKeepCount] = useState(25);
+  const [pruneKeepCount, setPruneKeepCount] = useState(5);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerWidth, setDrawerWidth] = useState(DEFAULT_DRAWER_WIDTH);
