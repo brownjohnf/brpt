@@ -5,19 +5,24 @@ interface TopBarProps {
   left?: ReactNode;
   right?: ReactNode;
   hasUnreadNotifications?: boolean;
+  animations?: "normal" | "jack";
 }
 
-export function TopBar({ children, left, right, hasUnreadNotifications }: TopBarProps): ReactNode {
+export function TopBar({ children, left, right, hasUnreadNotifications, animations = "normal" }: TopBarProps): ReactNode {
+  const breathing = hasUnreadNotifications
+    ? (animations === "normal" ? "true" : "static")
+    : undefined;
   return (
     <div
+      data-breathing={breathing}
       className={`flex items-center justify-between gap-2 px-4 shrink-0 border-b transition-colors duration-300 ${
         hasUnreadNotifications
-          ? "bg-[var(--status-glow)]/15 border-[var(--status-glow)]/30"
+          ? "border-[var(--status-glow)]/30"
           : "border-[var(--sidebar-border)]"
       }`}
       style={{
         height: "var(--top-bar-height)",
-        ...(hasUnreadNotifications ? {} : { background: "var(--sidebar-bg)" }),
+        ...(!hasUnreadNotifications ? { background: "var(--sidebar-bg)" } : {}),
       }}
     >
       {left}
@@ -104,13 +109,15 @@ interface DrawerToggleProps {
   drawerOpen: boolean;
   unreadNotificationCount: number;
   onToggleDrawer: () => void;
+  shaking?: boolean;
 }
 
-export function DrawerToggle({ drawerOpen, unreadNotificationCount, onToggleDrawer }: DrawerToggleProps): ReactNode {
+export function DrawerToggle({ drawerOpen, unreadNotificationCount, onToggleDrawer, shaking }: DrawerToggleProps): ReactNode {
   return (
     <>
       {unreadNotificationCount > 0 && (
         <button
+          data-shaking={shaking ? "true" : undefined}
           className="shrink-0 relative cursor-pointer opacity-60 hover:opacity-100 transition-opacity"
           onClick={onToggleDrawer}
           title={`${unreadNotificationCount} unread notification${unreadNotificationCount === 1 ? "" : "s"}`}

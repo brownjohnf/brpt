@@ -114,6 +114,48 @@ body[data-theme="dark"] ::highlight(search-active) {
   background-color: rgba(245, 158, 11, 0.4);
 }
 
+@keyframes bell-shake {
+  0% { transform: rotate(0deg); }
+  15% { transform: rotate(15deg); }
+  30% { transform: rotate(-12deg); }
+  45% { transform: rotate(10deg); }
+  60% { transform: rotate(-8deg); }
+  75% { transform: rotate(5deg); }
+  90% { transform: rotate(-2deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes topbar-breathe {
+  0%, 100% { opacity: 0.06; }
+  50% { opacity: 0.18; }
+}
+
+[data-shaking="true"] {
+  animation: bell-shake 0.6s ease-in-out;
+  transform-origin: center 2px;
+}
+
+[data-breathing] {
+  position: relative;
+}
+
+[data-breathing]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--status-glow);
+  pointer-events: none;
+  opacity: 0.05;
+}
+
+[data-breathing="true"]::before {
+  animation: topbar-breathe 5s ease-in-out infinite;
+}
+
+[data-breathing="static"]::before {
+  opacity: 0.15;
+}
+
 .markdown-body {
   background: transparent !important;
 }

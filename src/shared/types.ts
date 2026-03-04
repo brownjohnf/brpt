@@ -66,6 +66,7 @@ export interface AppConfig {
   sidebarWidth?: number;
   drawerWidth?: number;
   pruneKeepCount?: number;
+  animations?: "normal" | "jack";
 }
 
 export interface FileData {

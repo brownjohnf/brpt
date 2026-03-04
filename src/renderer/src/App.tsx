@@ -68,6 +68,8 @@ export default function App(): ReactNode {
       .slice(0, 5);
   }, [tabs, activeIndex]);
   const [pruneKeepCount, setPruneKeepCount] = useState(5);
+  const [animations, setAnimations] = useState<"normal" | "jack">("normal");
+  const [bellShaking, setBellShaking] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerWidth, setDrawerWidth] = useState(DEFAULT_DRAWER_WIDTH);
@@ -340,6 +342,34 @@ export default function App(): ReactNode {
     }
   }, [drawerOpen, activeTab?.path]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Bell shake animation on unread notifications
+  const hasUnreads = (activeTab?.unreadNotificationCount ?? 0) > 0;
+  useEffect(() => {
+    if (!hasUnreads) {
+      setBellShaking(false);
+      return;
+    }
+
+    // Shake immediately on entering unread state
+    setBellShaking(true);
+    const clearInitial = setTimeout(() => setBellShaking(false), 750);
+
+    if (animations !== "normal") {
+      return () => clearTimeout(clearInitial);
+    }
+
+    // Repeat every 30s in normal mode
+    const interval = setInterval(() => {
+      setBellShaking(true);
+      setTimeout(() => setBellShaking(false), 750);
+    }, 20_000);
+
+    return () => {
+      clearTimeout(clearInitial);
+      clearInterval(interval);
+    };
+  }, [hasUnreads, animations]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Persist active file to store
   useEffect(() => {
     if (configLoaded.current && activeTab) {
@@ -357,6 +387,7 @@ export default function App(): ReactNode {
     if (config.sidebarWidth != null) { setSidebarWidth(config.sidebarWidth); }
     if (config.drawerWidth != null) { setDrawerWidth(config.drawerWidth); }
     if (config.pruneKeepCount != null) { setPruneKeepCount(config.pruneKeepCount); }
+    if (config.animations != null) { setAnimations(config.animations); }
     mdview.getStore().then((store) => {
       dispatch({ type: "HYDRATE_ACTIVATIONS", tabActivations: store.tabActivations });
     });
@@ -585,7 +616,8 @@ export default function App(): ReactNode {
         />
         <div className="flex-1 flex flex-col overflow-hidden">
           <TopBar
-            hasUnreadNotifications={(activeTab?.unreadNotificationCount ?? 0) > 0}
+            hasUnreadNotifications={hasUnreads}
+            animations={animations}
             left={
               <SidebarToggle
                 sidebarOpen={sidebarOpen}
@@ -597,6 +629,7 @@ export default function App(): ReactNode {
                 drawerOpen={drawerOpen}
                 unreadNotificationCount={activeTab?.unreadNotificationCount ?? 0}
                 onToggleDrawer={toggleDrawer}
+                shaking={bellShaking}
               />
             }
           >
