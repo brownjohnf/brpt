@@ -30,7 +30,8 @@ function getTabGroup(
     }
   }
 
-  for (const folder of containerFolders) {
+  const sortedFolders = [...containerFolders].sort((a, b) => expandPath(b).length - expandPath(a).length);
+  for (const folder of sortedFolders) {
     const expanded = expandPath(folder).replace(/\/$/, "");
     if (filePath.startsWith(expanded + "/")) {
       const rest = filePath.slice(expanded.length + 1);

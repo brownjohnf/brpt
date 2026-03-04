@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type Rea
 import { toast, Toaster } from "sonner";
 import { ContentArea } from "./components/ContentArea";
 import { DEFAULT_DRAWER_WIDTH, NotificationDrawer } from "./components/NotificationDrawer";
-import { QuickGoto } from "./components/QuickGoto";
+import { QuickGoto, type Command } from "./components/QuickGoto";
 import { Sidebar } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
 import { DrawerToggle, SidebarToggle, TopBar } from "./components/TopBar";
@@ -588,6 +588,17 @@ export default function App(): ReactNode {
     document.documentElement.classList.toggle("dark", theme === "dark");
   }, [theme]);
 
+  const paletteCommands = useMemo<Command[]>(() => [
+    { id: "prune-tabs", label: "Prune Tabs", detail: `Close all except ${pruneKeepCount} most recent`, action: pruneTabs },
+    { id: "open-file", label: "Open File", detail: "Open file dialog", action: handleOpenDialog },
+    { id: "toggle-sidebar", label: "Toggle Sidebar", detail: "Show or hide the sidebar", action: toggleSidebar },
+    { id: "toggle-drawer", label: "Toggle Notification Drawer", detail: "Show or hide the drawer", action: toggleDrawer },
+    { id: "width-fixed", label: "Content Width: Fixed", detail: "Fixed width mode", action: () => changeContentWidthMode("fixed") },
+    { id: "width-capped", label: "Content Width: Capped", detail: "Capped width mode", action: () => changeContentWidthMode("capped") },
+    { id: "width-full", label: "Content Width: Full", detail: "Full width mode", action: () => changeContentWidthMode("full") },
+    { id: "toggle-theme", label: "Toggle Theme", detail: "Switch between light and dark", action: toggleTheme },
+  ], [toggleTheme, toggleSidebar, toggleDrawer, pruneTabs, handleOpenDialog, changeContentWidthMode, pruneKeepCount]);
+
   return (
     <>
       <div
@@ -713,6 +724,7 @@ export default function App(): ReactNode {
         <QuickGoto
           tabs={tabs}
           mruTabs={mruTabs}
+          commands={paletteCommands}
           onActivateTab={activateTab}
           onHighlight={setQuickGotoHighlight}
           onClose={() => setQuickGotoOpen(false)}
